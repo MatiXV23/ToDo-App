@@ -9,6 +9,7 @@ import * as epics from "@/server/services/epics";
 import * as members from "@/server/services/members";
 import * as notifications from "@/server/services/notifications";
 import * as projects from "@/server/services/projects";
+import * as review from "@/server/services/review";
 import * as sprints from "@/server/services/sprints";
 import * as tags from "@/server/services/tags";
 import * as tasks from "@/server/services/tasks";
@@ -69,6 +70,9 @@ export const taskRouter = router({
   move: p.input(tasks.moveTaskSchema).mutation(({ ctx, input }) => tasks.moveTask(ctx.actor, input)),
   delete: p.input(z.object({ taskId: id })).mutation(({ ctx, input }) => tasks.deleteTask(ctx.actor, input.taskId)),
   restore: p.input(z.object({ taskId: id })).mutation(({ ctx, input }) => tasks.restoreTask(ctx.actor, input.taskId)),
+  setApproval: p
+    .input(z.object({ taskId: id, approved: z.boolean() }))
+    .mutation(({ ctx, input }) => review.setTaskApproval(ctx.actor, input.taskId, input.approved)),
 });
 
 export const commentRouter = router({
@@ -126,6 +130,9 @@ export const attachmentRouter = router({
 export const tokenRouter = router({
   list: p.query(({ ctx }) => apiTokens.listApiTokens(ctx.user.id)),
   create: p.input(apiTokens.createTokenSchema).mutation(({ ctx, input }) => apiTokens.createApiToken(ctx.user.id, input)),
+  setExternal: p
+    .input(z.object({ tokenId: id, external: z.boolean() }))
+    .mutation(({ ctx, input }) => apiTokens.setApiTokenExternal(ctx.user.id, input.tokenId, input.external)),
   revoke: p.input(z.object({ tokenId: id })).mutation(({ ctx, input }) => apiTokens.revokeApiToken(ctx.user.id, input.tokenId)),
 });
 

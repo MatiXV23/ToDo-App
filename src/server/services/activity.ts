@@ -5,7 +5,18 @@ import { type Actor, actorRef } from "@/server/permissions/access";
 export type ActivityEntry = {
   taskId: string;
   projectId: string;
-  kind: "created" | "updated" | "moved" | "deleted" | "restored" | "linked" | "unlinked" | "attached" | "detached" | "agent";
+  kind:
+    | "created"
+    | "updated"
+    | "moved"
+    | "deleted"
+    | "restored"
+    | "linked"
+    | "unlinked"
+    | "attached"
+    | "detached"
+    | "agent"
+    | "review";
   field?: string;
   oldValue?: unknown;
   newValue?: unknown;

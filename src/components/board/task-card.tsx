@@ -12,6 +12,7 @@ import {
   ListChecks,
   MessageSquare,
   Paperclip,
+  ShieldAlert,
 } from "lucide-react";
 import { memo } from "react";
 import { EpicChip, KeyBadge, TagChip } from "@/components/common/chips";
@@ -57,14 +58,22 @@ export const TaskCardBody = memo(function TaskCardBody({ task, lookups, overlay 
   const tags = task.tagIds.map((id) => lookups.tags.get(id)).filter((t) => !!t);
   const pr = task.prState ? PR_ICONS[task.prState as PrState] : null;
   const done = !!task.completedAt;
+  const needsApproval = task.reviewStatus === "pending";
 
   return (
     <div
       className={cn(
         "group rounded-lg border bg-card p-2.5 text-left shadow-xs transition-shadow hover:border-foreground/20",
+        needsApproval && "border-amber-300",
         overlay && "rotate-1 shadow-lg ring-1 ring-foreground/10",
       )}
     >
+      {needsApproval ? (
+        <div className="mb-1.5 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
+          <ShieldAlert className="size-3" />
+          Por aprobar
+        </div>
+      ) : null}
       {task.parentId ? (
         <div className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground">
           <CornerDownRight className="size-3" />

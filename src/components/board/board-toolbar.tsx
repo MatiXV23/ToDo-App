@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Search, ShieldAlert, X } from "lucide-react";
 import { OptionPicker, type PickerOption } from "@/components/common/option-picker";
 import { PriorityIcon } from "@/components/common/priority-icon";
 import { UserAvatar } from "@/components/common/user-avatar";
@@ -59,6 +59,7 @@ export function BoardToolbar({
     icon: <PriorityIcon priority={p} />,
   }));
   const count = activeFilterCount(filters);
+  const pendingReview = board.tasks.filter((t) => t.reviewStatus === "pending" && (filters.showSubtasks || !t.parentId)).length;
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 py-3 md:px-6">
@@ -106,6 +107,19 @@ export function BoardToolbar({
       >
         <FilterButton label="Prioridad" count={filters.priorities.length} />
       </OptionPicker>
+      {pendingReview > 0 || filters.pendingReview ? (
+        <Button
+          variant="outline"
+          size="sm"
+          aria-pressed={filters.pendingReview}
+          className={cn("text-amber-800", filters.pendingReview && "border-amber-300 bg-amber-50")}
+          onClick={() => onChange({ ...filters, pendingReview: !filters.pendingReview })}
+        >
+          <ShieldAlert />
+          Por aprobar
+          <span className="rounded bg-amber-600 px-1 text-[10px] text-white">{pendingReview}</span>
+        </Button>
+      ) : null}
       {count > 0 ? (
         <Button variant="ghost" size="sm" onClick={() => onChange({ ...EMPTY_FILTERS, showSubtasks: filters.showSubtasks })}>
           <X /> Limpiar

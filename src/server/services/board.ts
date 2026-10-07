@@ -82,6 +82,7 @@ export async function getBoard(actor: Actor, projectId: string) {
         commentCount: sql<number>`(select count(*) from comments c where c.task_id = ${OUTER_TASK_ID})`.mapWith(Number),
         attachmentCount: sql<number>`(select count(*) from task_attachments a where a.task_id = ${OUTER_TASK_ID})`.mapWith(Number),
         agentStatus: tasks.agentStatus,
+        reviewStatus: tasks.reviewStatus,
         prState: sql<string | null>`(
           select l.state from task_vcs_links l
           where l.task_id = ${OUTER_TASK_ID} and l.kind = 'pull_request'

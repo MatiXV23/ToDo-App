@@ -13,6 +13,8 @@ export type BoardFilters = {
   epics: string[];
   tags: string[];
   priorities: Priority[];
+  /** Solo las que llegaron por un token externo y esperan aprobación. */
+  pendingReview: boolean;
   showSubtasks: boolean;
 };
 
@@ -22,11 +24,14 @@ export const EMPTY_FILTERS: BoardFilters = {
   epics: [],
   tags: [],
   priorities: [],
+  pendingReview: false,
   showSubtasks: false,
 };
 
 export function activeFilterCount(f: BoardFilters) {
-  return (f.q ? 1 : 0) + f.assignees.length + f.epics.length + f.tags.length + f.priorities.length;
+  return (
+    (f.q ? 1 : 0) + f.assignees.length + f.epics.length + f.tags.length + f.priorities.length + (f.pendingReview ? 1 : 0)
+  );
 }
 
 const normalize = (s: string) => slugify(s).replace(/-/g, " ");
@@ -42,6 +47,7 @@ export function matchesFilters(task: BoardTask, f: BoardFilters, projectKey: str
   if (f.epics.length && !f.epics.includes(task.epicId ?? "none")) return false;
   if (f.tags.length && !task.tagIds.some((t) => f.tags.includes(t))) return false;
   if (f.priorities.length && !f.priorities.includes(task.priority)) return false;
+  if (f.pendingReview && task.reviewStatus !== "pending") return false;
   return true;
 }
 

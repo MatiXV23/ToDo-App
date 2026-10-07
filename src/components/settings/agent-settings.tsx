@@ -101,7 +101,8 @@ export function AgentSettings({ project }: { project: ProjectInfo }) {
           ) : null}
           <p className="text-xs text-muted-foreground">
             Zona horaria: {s.timezone}. Los PRs “fáciles” se mergean solos dentro de esa ventana cuando los checks están en verde. Los
-            grandes esperan tu revisión.
+            grandes esperan tu revisión. Las tareas que llegan por un token externo tienen que estar aprobadas para que su PR se
+            mergee solo.
           </p>
           {!github.data?.repos.length ? (
             <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">

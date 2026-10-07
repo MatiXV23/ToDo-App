@@ -28,6 +28,7 @@ import { AgentBanner } from "./agent-banner";
 import { Attachments } from "./attachments";
 import { Comments } from "./comments";
 import { DescriptionEditor } from "./description-editor";
+import { ReviewBanner } from "./review-banner";
 import {
   AssigneeField,
   ColumnField,
@@ -206,6 +207,7 @@ function TaskDetailView({
         <div className="grid gap-6 p-4 @2xl:grid-cols-[1fr_17rem] @2xl:p-6">
           <div className="min-w-0 space-y-6">
             <TitleEditor value={task.title} onSave={(title) => update({ title })} disabled={!canEdit} />
+            <ReviewBanner task={task} canEdit={canEdit} />
             <AgentBanner task={task} canEdit={canEdit} />
             <DescriptionEditor
               value={task.descriptionMd}

@@ -14,6 +14,7 @@ import {
   submitPullRequest,
   updateAgentSettings,
 } from "@/server/services/agent";
+import { setTaskApproval } from "@/server/services/review";
 import { createTask, getTaskDetail, moveTask } from "@/server/services/tasks";
 import { pullRequestPayload } from "../fixtures/github";
 import { connectTestRepo, deliver } from "./github-helpers";
@@ -156,6 +157,35 @@ describe("agente: PRs y merge automático", () => {
     expect(merges).toEqual([]);
     await runAgentAutoMerge(new Date("2026-10-07T23:30:00Z"));
     expect(merges).toEqual([7]);
+  });
+
+  it("no mergea solo el PR de una tarea externa hasta que alguien la aprueba", async () => {
+    const { project, owner, iaTagId, key } = await setup();
+    const itp = { type: "user" as const, userId: owner.id, via: "ITP App", external: true };
+    const t = await createTask(itp, { projectId: project.id, title: "Reporte", tagIds: [iaTagId] });
+    const [entry] = await getAgentQueue(as(owner));
+    expect(entry.queued.find((q) => q.key === key(t.number))).toMatchObject({ review: "pending" });
+
+    await claimTasks(as(owner), { tasks: [key(t.number)], branch: "claude/reporte" });
+    const submitted = await submitPullRequest(as(owner), {
+      tasks: [key(t.number)],
+      repository: "matix/todoapp",
+      number: 8,
+      url: "https://github.com/matix/todoapp/pull/8",
+      branch: "claude/reporte",
+      complexity: "easy",
+    });
+    expect(submitted.waitingApproval).toEqual([key(t.number)]);
+    expect((await getTaskDetail(as(owner), t.id)).comments.at(-1)?.bodyMd).toMatch(/cuando apruebes/);
+
+    const merges = fakeGithub({ mergeableState: "clean" });
+    await runAgentAutoMerge();
+    expect(merges).toEqual([]);
+    expect((await db.select().from(agentPullRequests))[0]).toMatchObject({ status: "pending", lastReason: `Espera que apruebes ${key(t.number)}` });
+
+    await setTaskApproval(as(owner), t.id, true);
+    await runAgentAutoMerge(new Date(Date.now() + 5 * 60_000));
+    expect(merges).toEqual([8]);
   });
 
   it("no mergea con checks fallando y deja el motivo", async () => {

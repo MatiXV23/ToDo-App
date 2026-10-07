@@ -7,6 +7,7 @@ import { projectChannel, publish } from "@/server/events";
 import { can } from "@/server/permissions";
 import { type Actor, actorUserId, authorize } from "@/server/permissions/access";
 import { notify } from "./notifications";
+import { isExternalActor, requestReviewIfExternal } from "./review";
 import { loadTask } from "./tasks";
 
 export const addCommentSchema = z.object({
@@ -30,6 +31,7 @@ export async function addComment(actor: Actor, input: z.input<typeof addCommentS
         via: actor.type === "user" ? (actor.via ?? null) : null,
       })
       .returning();
+    await requestReviewIfExternal(tx, actor, [taskId]);
 
     // Solo los comentarios de personas generan avisos; los automáticos serían ruido.
     const recipients =
@@ -70,7 +72,9 @@ export async function updateComment(actor: Actor, input: { commentId: string; bo
       .set({ bodyMd, editedAt: new Date() })
       .where(eq(comments.id, input.commentId))
       .returning();
+    await requestReviewIfExternal(tx, actor, [task.id]);
     await publish(tx, projectChannel(task.projectId), { type: "task", taskId: task.id }, actor);
+    if (isExternalActor(actor)) await publish(tx, projectChannel(task.projectId), { type: "board", taskIds: [task.id] }, actor);
     return updated;
   });
 }

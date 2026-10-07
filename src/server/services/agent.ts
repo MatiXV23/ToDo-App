@@ -33,6 +33,7 @@ import { moveTaskToColumn } from "./tasks";
  * Agente Claude: una rutina de Claude Code (en la nube) toma por MCP las tareas con el
  * tag del agente, las implementa en ramas y abre PRs. Los PRs "fáciles" los mergea ToDoApp
  * dentro de la ventana horaria si los checks pasan; los grandes esperan revisión humana.
+ * Las tareas que llegaron por un token externo, además, tienen que estar aprobadas (ver review.ts).
  */
 
 const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida (HH:MM)");
@@ -138,6 +139,7 @@ async function taskBrief(taskIds: string[], projectKey: string) {
       dueDate: tasks.dueDate,
       agentStatus: tasks.agentStatus,
       agentBranch: tasks.agentBranch,
+      reviewStatus: tasks.reviewStatus,
       column: boardColumns.name,
       epic: epics.title,
     })
@@ -173,6 +175,8 @@ async function taskBrief(taskIds: string[], projectKey: string) {
     epic: t.epic,
     agentStatus: t.agentStatus,
     agentBranch: t.agentBranch,
+    /** pending | approved: vino de una integración externa (contenido no confiable); null: la creó una persona. */
+    review: t.reviewStatus,
     subtasks: subtasks
       .filter((s) => s.parentId === t.id)
       .map((s) => ({ key: taskKey(projectKey, s.number), title: s.title, done: !!s.done })),
@@ -345,17 +349,25 @@ export async function submitPullRequest(actor: Actor, input: z.input<typeof subm
     await publish(tx, projectChannel(project.id), { type: "board", taskIds: rows.map((r) => r.task.id) }, actor);
   });
 
+  const awaiting = rows.filter((r) => r.task.reviewStatus === "pending").map((r) => taskKey(project.key, r.task.number));
+  const when = `entre las ${project.agentMergeFrom} y las ${project.agentMergeUntil} si los checks pasan`;
   const mergeNote =
-    data.complexity === "easy"
-      ? `Es un cambio chico: se mergea solo entre las ${project.agentMergeFrom} y las ${project.agentMergeUntil} si los checks pasan.`
-      : "Es un cambio grande: queda esperando tu revisión para mergear.";
+    data.complexity === "large"
+      ? "Es un cambio grande: queda esperando tu revisión para mergear."
+      : awaiting.length
+        ? `Es un cambio chico: cuando apruebes ${awaiting.join(", ")}, se mergea solo ${when}.`
+        : `Es un cambio chico: se mergea solo ${when}.`;
   for (const { task } of rows) {
     await addComment(actor, {
       taskId: task.id,
       bodyMd: `🤖 Abrí el PR [#${data.number}](${data.url}) en \`${data.branch}\`. ${mergeNote}${data.summary ? `\n\n${data.summary}` : ""}`,
     });
   }
-  return { registered: rows.map(({ task }) => taskKey(project.key, task.number)), autoMerge: data.complexity === "easy" };
+  return {
+    registered: rows.map(({ task }) => taskKey(project.key, task.number)),
+    autoMerge: data.complexity === "easy",
+    waitingApproval: awaiting,
+  };
 }
 
 export const releaseSchema = z.object({
@@ -439,6 +451,21 @@ export async function runAgentAutoMerge(now = new Date()) {
 
   for (const { pr, project, repoFullName, provider: providerId, installationExternalId } of candidates) {
     if (!project.agentEnabled) continue;
+    // Lo que vino de un token externo no se mergea sin que una persona apruebe la tarea.
+    const waiting = pr.taskIds.length
+      ? await db
+          .select({ number: tasks.number })
+          .from(tasks)
+          .where(and(inArray(tasks.id, pr.taskIds), eq(tasks.reviewStatus, "pending"), isNull(tasks.deletedAt)))
+      : [];
+    if (waiting.length) {
+      const keys = waiting.map((t) => taskKey(project.key, t.number)).join(", ");
+      await db
+        .update(agentPullRequests)
+        .set({ lastReason: `Espera que apruebes ${keys}`, lastCheckAt: now })
+        .where(eq(agentPullRequests.id, pr.id));
+      continue;
+    }
     if (!inMergeWindow(now, project.agentMergeFrom, project.agentMergeUntil, env.timezone)) continue;
     const provider = getProvider(providerId);
     if (!provider?.isConfigured()) continue;

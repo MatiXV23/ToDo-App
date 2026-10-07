@@ -203,6 +203,24 @@ claude mcp add --transport http todoapp https://todo.tudominio.com/api/mcp --hea
 
 Los comentarios y cambios hechos por API muestran "vía <nombre del token>". Los errores devuelven las opciones válidas, por ejemplo las columnas existentes cuando se nombra una que no existe.
 
+Para integraciones sin SDK de MCP alcanza con un solo `POST` por operación, sin `initialize` previo:
+
+```bash
+curl -s "$APP_URL/api/mcp" \
+  -H "Authorization: Bearer tda_…" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_task","arguments":{"project":"TDA","title":"…","tags":["IA"]}}}'
+```
+
+La respuesta trae el resultado como texto JSON en `result.content[0].text`; si falla, `result.isError` es `true` y el texto explica el motivo.
+
+### Integraciones externas y aprobación
+
+Un token marcado como **Integración externa** (al crearlo, o con el interruptor *Externo* de la lista) es para apps que cargan contenido de terceros, por ejemplo una app que convierte reportes de usuarios en tareas. Ese contenido no es confiable, así que:
+
+- Toda tarea que ese token crea o modifica (campos, comentarios, adjuntos, subtareas) queda **Por aprobar**: se marca en el tablero, tiene un filtro propio y muestra un aviso en el detalle.
+- La aprobás desde la tarea, después de leerla. Solo puede hacerlo una persona con permiso de edición desde la app, nunca un token. Si el token externo vuelve a cambiarla, hay que aprobarla de nuevo.
+- El agente puede trabajarla igual, pero su PR **no se mergea solo** hasta que la apruebes, aunque sea *easy*. Una vez aprobada, los PRs *easy* siguen el flujo normal.
+
 ## Instalar como app (PWA)
 
 ToDoApp se puede instalar y abre en su propia ventana, sin barra del navegador:
@@ -223,7 +241,7 @@ Delegá tareas a Claude poniéndoles un tag (por defecto **IA**). Para no tener 
    - agrupa tareas afines en una misma rama (`claude/tda-12-tda-15-…`) y las toma (`agent_claim`), lo que las pasa a "en curso";
    - implementa, corre los tests, abre un PR y lo registra (`agent_submit_pr`) como **easy** o **large**;
    - si algo es ambiguo, bloquea la tarea con una pregunta (`agent_release`). La respondés en un comentario y la volvés a la cola desde la tarea.
-4. **Merge:** los PRs *easy* los mergea ToDoApp (no la rutina) dentro de la ventana horaria, solo si GitHub los da por listos (checks en verde, sin conflictos). Los *large* esperan tu revisión. Al mergear a la rama por defecto, el GitHub Action de tu repo despliega. El estado y el último motivo de cada PR se ven en la misma pantalla.
+4. **Merge:** los PRs *easy* los mergea ToDoApp (no la rutina) dentro de la ventana horaria, solo si GitHub los da por listos (checks en verde, sin conflictos) y si sus tareas no están **Por aprobar** (ver [Integraciones externas y aprobación](#integraciones-externas-y-aprobación)). Los *large* esperan tu revisión. Al mergear a la rama por defecto, el GitHub Action de tu repo despliega. El estado y el último motivo de cada PR se ven en la misma pantalla.
 
 ## Tests
 
@@ -239,6 +257,7 @@ Los tests de integración corren contra una base Postgres real (`todoapp_test`),
 - **GitHub**: firma de webhooks, idempotencia, vinculación por clave y estados del PR.
 - **IA**: validación de respuestas, permisos y límite de uso (con un proveedor falso).
 - **MCP y agente**: herramientas por un cliente MCP real en memoria, permisos del token, cola, toma de tareas, PRs, ventana horaria y merge automático (con un GitHub falso).
+- **Aprobación**: tokens externos por HTTP, quién puede aprobar, re-aprobación ante cambios externos y bloqueo del merge automático.
 - **Adjuntos**: detección de tipo por contenido, límites y permisos.
 
 ## Producción con Docker

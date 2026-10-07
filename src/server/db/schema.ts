@@ -291,6 +291,13 @@ export const tasks = pgTable(
     agentStatus: text("agent_status"),
     agentBranch: text("agent_branch"),
     agentClaimedAt: ts("agent_claimed_at"),
+    /**
+     * Aprobación de lo que llega por un token externo (contenido no confiable):
+     * pending | approved; null = no hace falta. Sin aprobar, el agente no mergea solo.
+     */
+    reviewStatus: text("review_status"),
+    reviewedById: text("reviewed_by_id").references(() => user.id, { onDelete: "set null" }),
+    reviewedAt: ts("reviewed_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     deletedAt: ts("deleted_at"),
@@ -647,6 +654,8 @@ export const apiTokens = pgTable(
     /** SHA-256 del token: el token en claro solo se muestra al crearlo. */
     tokenHash: text("token_hash").notNull().unique(),
     prefix: text("prefix").notNull(),
+    /** Integración externa: lo que crea o cambia queda pendiente de aprobación. */
+    external: boolean("external").notNull().default(false),
     lastUsedAt: ts("last_used_at"),
     createdAt: createdAt(),
     revokedAt: ts("revoked_at"),

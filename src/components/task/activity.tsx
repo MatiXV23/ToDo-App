@@ -54,6 +54,12 @@ function describe(entry: Entry) {
           borró el adjunto <b>{show(null, entry.oldValue)}</b>
         </>
       );
+    case "review":
+      return entry.field === "approved"
+        ? "aprobó la tarea"
+        : entry.field === "revoked"
+          ? "le quitó la aprobación"
+          : "dejó la tarea pendiente de aprobación";
     case "agent":
       return entry.field === "claimed" ? (
         <>

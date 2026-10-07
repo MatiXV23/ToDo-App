@@ -5,7 +5,9 @@ import { Copy, KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { timeAgo } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 
@@ -37,10 +39,14 @@ export function TokensView({ appUrl }: { appUrl: string }) {
   const queryClient = useQueryClient();
   const tokens = useQuery(trpc.token.list.queryOptions());
   const [name, setName] = useState("Claude Code");
+  const [external, setExternal] = useState(false);
   const [created, setCreated] = useState<string | null>(null);
   const refresh = () => queryClient.invalidateQueries(trpc.token.pathFilter());
   const create = useMutation(trpc.token.create.mutationOptions({ onSuccess: (t) => (setCreated(t.token), refresh()) }));
   const revoke = useMutation(trpc.token.revoke.mutationOptions({ onSuccess: refresh }));
+  const setTokenExternal = useMutation(
+    trpc.token.setExternal.mutationOptions({ onSuccess: refresh, onError: (err) => toast.error(err.message) }),
+  );
   const command = `claude mcp add --transport http todoapp ${appUrl}/api/mcp --header "Authorization: Bearer ${created ?? "<tu token>"}"`;
 
   return (
@@ -56,16 +62,28 @@ export function TokensView({ appUrl }: { appUrl: string }) {
       <section className="space-y-3 rounded-xl border p-5">
         <h2 className="text-sm font-semibold">Nuevo token</h2>
         <form
-          className="flex gap-2"
+          className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
-            create.mutate({ name });
+            create.mutate({ name, external });
           }}
         >
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre (ej. Claude Code en mi Mac)" />
-          <Button type="submit" disabled={!name.trim() || create.isPending}>
-            Crear token
-          </Button>
+          <div className="flex gap-2">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre (ej. Claude Code en mi Mac)" />
+            <Button type="submit" disabled={!name.trim() || create.isPending}>
+              Crear token
+            </Button>
+          </div>
+          <label className="flex items-start gap-2 text-sm">
+            <Checkbox className="mt-0.5" checked={external} onCheckedChange={(checked) => setExternal(checked === true)} />
+            <span>
+              Integración externa
+              <span className="block text-muted-foreground">
+                Para apps que cargan contenido de terceros, como reportes de usuarios. Las tareas que cree o modifique quedan
+                pendientes de tu aprobación, y sin ella el agente no mergea solo sus PRs.
+              </span>
+            </span>
+          </label>
         </form>
         {created ? (
           <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -99,6 +117,15 @@ export function TokensView({ appUrl }: { appUrl: string }) {
                     {t.lastUsedAt ? `usado ${timeAgo(t.lastUsedAt)}` : "sin uso"}
                   </p>
                 </div>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title="Sus tareas esperan tu aprobación">
+                  <Switch
+                    size="sm"
+                    checked={t.external}
+                    disabled={setTokenExternal.isPending}
+                    onCheckedChange={(checked) => setTokenExternal.mutate({ tokenId: t.id, external: checked })}
+                  />
+                  Externo
+                </label>
                 <Button
                   variant="ghost"
                   size="icon-sm"

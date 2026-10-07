@@ -7,7 +7,7 @@ export async function getRequestActor(req: Request): Promise<Actor | null> {
   const authorization = req.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
     const result = await authenticateApiToken(authorization.slice(7).trim());
-    return result ? { type: "user", userId: result.user.id, via: result.tokenName } : null;
+    return result ? { type: "user", userId: result.user.id, via: result.tokenName, external: result.external } : null;
   }
   const user = await getSessionUser(req.headers);
   return user ? { type: "user", userId: user.id } : null;

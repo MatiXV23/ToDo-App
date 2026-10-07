@@ -26,6 +26,7 @@ import { rankBetween } from "@/lib/rank";
 import { type ActivityEntry, logActivity } from "./activity";
 import { applyColumnTags, columnTagIds } from "./column-tags";
 import { notify } from "./notifications";
+import { isExternalActor, requestReviewIfExternal } from "./review";
 
 // ─── Esquemas ───────────────────────────────────────────────────────────
 
@@ -284,6 +285,7 @@ export async function createTask(actor: Actor, input: z.input<typeof createTaskS
         dueDate: data.dueDate ?? null,
         estimateHours: data.estimateHours ?? null,
         completedAt: column.category === "done" ? new Date() : null,
+        reviewStatus: isExternalActor(actor) ? "pending" : null,
       })
       .returning();
 
@@ -293,6 +295,8 @@ export async function createTask(actor: Actor, input: z.input<typeof createTaskS
       await tx.insert(taskTags).values([...tagIds].map((tagId) => ({ taskId: task.id, tagId })));
     }
     await logActivity(tx, actor, [{ taskId: task.id, projectId: task.projectId, kind: "created" }]);
+    // Una subtarea externa también cambia lo que el agente ve de la principal.
+    if (parent) await requestReviewIfExternal(tx, actor, [parent.id]);
     await emitDomainEvent(tx, {
       projectId: task.projectId,
       type: "task.created",
@@ -399,6 +403,7 @@ export async function updateTask(actor: Actor, input: z.input<typeof updateTaskS
       [task] = await tx.update(tasks).set(changes).where(eq(tasks.id, task.id)).returning();
     }
     await logActivity(tx, actor, activity);
+    if (activity.length) await requestReviewIfExternal(tx, actor, [task.id]);
 
     // Las subtareas siguen el sprint de su tarea principal.
     if (changes.sprintId !== undefined && !task.parentId) {

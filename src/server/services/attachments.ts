@@ -7,6 +7,7 @@ import { projectChannel, publish } from "@/server/events";
 import { type Actor, actorUserId, authorize } from "@/server/permissions/access";
 import { deleteStoredFile, detectImage, saveFile } from "@/server/storage";
 import { logActivity } from "./activity";
+import { requestReviewIfExternal } from "./review";
 import { loadTask } from "./tasks";
 
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -40,6 +41,7 @@ export async function addAttachment(actor: Actor, input: { taskId: string; fileN
       await logActivity(tx, actor, [
         { taskId: task.id, projectId: task.projectId, kind: "attached", field: "attachment", newValue: { id: row.id, label: fileName } },
       ]);
+      await requestReviewIfExternal(tx, actor, [task.id]);
       await publish(tx, projectChannel(task.projectId), { type: "task", taskId: task.id }, actor);
       await publish(tx, projectChannel(task.projectId), { type: "board", taskIds: [task.id] }, actor);
       return row;

@@ -17,7 +17,7 @@ async function handler(req: Request) {
       { status: 401, headers: { "WWW-Authenticate": 'Bearer realm="todoapp"' } },
     );
   }
-  const server = createMcpServer({ type: "user", userId: auth.user.id, via: auth.tokenName });
+  const server = createMcpServer({ type: "user", userId: auth.user.id, via: auth.tokenName, external: auth.external });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   try {
