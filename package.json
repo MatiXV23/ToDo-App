@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "db:up": "docker compose up -d --wait",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx --env-file=.env src/server/db/migrate.ts",
+    "db:migrate": "tsx --env-file=.env src/server/db/migrate-cli.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",

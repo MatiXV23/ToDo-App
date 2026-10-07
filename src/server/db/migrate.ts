@@ -12,14 +12,3 @@ export async function runMigrations(connectionString: string) {
     await pool.end();
   }
 }
-
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL no está definida");
-  runMigrations(url)
-    .then(() => console.log("Migraciones aplicadas"))
-    .catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-}

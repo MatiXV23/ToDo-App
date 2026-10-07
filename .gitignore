@@ -46,3 +46,6 @@ next-env.d.ts
 /playwright/.cache/
 
 !.env.example
+
+# bundles de producción
+/dist
