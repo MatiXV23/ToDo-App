@@ -49,3 +49,6 @@ next-env.d.ts
 
 # bundles de producción
 /dist
+
+# adjuntos subidos en desarrollo
+/uploads

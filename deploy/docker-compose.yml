@@ -43,6 +43,8 @@ services:
       migrate:
         condition: service_completed_successfully
     networks: [default, web]
+    volumes:
+      - uploads:/data/uploads
     # Acceso directo opcional desde la LAN (el login con Google necesita el dominio público).
     ports:
       - "${WEB_PORT:-3100}:3000"
@@ -62,6 +64,8 @@ services:
 
 volumes:
   pgdata:
+  # Imágenes adjuntas a las tareas.
+  uploads:
 
 networks:
   # Red compartida con el Caddy del servidor (docker network create web).

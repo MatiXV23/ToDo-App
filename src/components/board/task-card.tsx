@@ -3,6 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Bot,
   CornerDownRight,
   GitMerge,
   GitPullRequest,
@@ -10,6 +11,7 @@ import {
   GitPullRequestDraft,
   ListChecks,
   MessageSquare,
+  Paperclip,
 } from "lucide-react";
 import { memo } from "react";
 import { EpicChip, KeyBadge, TagChip } from "@/components/common/chips";
@@ -19,7 +21,15 @@ import { UserAvatar } from "@/components/common/user-avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type PrState, PR_STATE_META, taskKey } from "@/lib/domain";
 import { cn } from "@/lib/utils";
+import { AGENT_STATUS } from "@/components/task/agent-banner";
 import type { Board, BoardTask } from "./filters";
+
+const AGENT_ICON: Record<string, string> = {
+  claimed: "text-brand animate-pulse",
+  pr_open: "text-amber-600",
+  merged: "text-purple-600",
+  blocked: "text-red-600",
+};
 
 const PR_ICONS: Record<PrState, { icon: typeof GitPullRequest; className: string }> = {
   draft: { icon: GitPullRequestDraft, className: "text-zinc-400" },
@@ -85,6 +95,20 @@ export const TaskCardBody = memo(function TaskCardBody({ task, lookups, overlay 
             <MessageSquare className="size-3" />
             {task.commentCount}
           </span>
+        ) : null}
+        {task.attachmentCount > 0 ? (
+          <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
+            <Paperclip className="size-3" />
+            {task.attachmentCount}
+          </span>
+        ) : null}
+        {task.agentStatus ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Bot className={cn("size-3.5", AGENT_ICON[task.agentStatus] ?? "text-muted-foreground")} />
+            </TooltipTrigger>
+            <TooltipContent>{AGENT_STATUS[task.agentStatus]?.label ?? "Agente Claude"}</TooltipContent>
+          </Tooltip>
         ) : null}
         {pr ? (
           <Tooltip>

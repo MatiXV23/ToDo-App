@@ -6,7 +6,8 @@ import { type Action, can, type Role } from "./index";
 
 /** Quién ejecuta una operación. Las automatizaciones e integraciones no tienen rol propio. */
 export type Actor =
-  | { type: "user"; userId: string; clientId?: string | null }
+  /** `via`: nombre del token de API cuando la acción viene de la API/MCP. */
+  | { type: "user"; userId: string; clientId?: string | null; via?: string | null }
   | { type: "automation"; ruleId: string; runId: string; depth: number; chain: string[] }
   | { type: "integration"; provider: string }
   | { type: "system" };

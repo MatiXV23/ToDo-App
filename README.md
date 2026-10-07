@@ -9,6 +9,9 @@ Tablero de tareas estilo Scrum/Kanban, pensado para uso personal con colaboraci�
 - **Automatizaciones** "cuando ocurre X, si se cumple Y, hacer Z", con registro de cada ejecución y su motivo.
 - **IA** (DeepSeek) como sugerencia que siempre se revisa antes de aplicar.
 - **Buzón** de notificaciones: invitaciones, asignaciones, comentarios y vencimientos.
+- **Adjuntos**: imágenes en las tareas como evidencia o referencia (arrastrar, pegar o elegir).
+- **API MCP** para que Claude Code vea, cree, mueva y comente tareas con un token personal.
+- **Agente Claude**: las tareas con el tag de IA las implementa una rutina de Claude Code, que abre PRs; los cambios chicos se mergean solos en una ventana horaria.
 
 ## Stack
 
@@ -92,6 +95,7 @@ Mientras no configures Google, en desarrollo hay un **login de prueba** (usuario
 | `AI_API_KEY` | para IA | Sin ella las funciones de IA no aparecen. |
 | `AI_MODEL` | no | Por defecto `deepseek-v4-flash`. |
 | `AI_RATE_LIMIT` | no | Pedidos de IA por usuario cada 10 minutos (por defecto 30). |
+| `UPLOADS_DIR` | no | Carpeta de adjuntos. Por defecto `./uploads`; en Docker, `/data/uploads` (volumen). |
 
 ## Configurar Google OAuth
 
@@ -116,7 +120,7 @@ La integración usa una **GitHub App** (permisos acotados y webhooks incluidos).
    - **Webhook**: activo. URL `APP_URL/api/webhooks/github` y un **Webhook secret** (por ejemplo `openssl rand -hex 32`).
 3. **Permisos de repositorio**:
    - *Contents*: **Read and write** (crear ramas y comparar contra la base).
-   - *Pull requests*: **Read-only**.
+   - *Pull requests*: **Read and write** (consultar el estado y mergear los PRs del agente).
    - *Metadata*: Read-only (obligatorio).
 4. **Eventos a los que suscribirse**: *Create*, *Delete*, *Push*, *Pull request*, *Pull request review*. Los de instalación llegan solos.
 5. **Where can this GitHub App be installed?**: *Only on this account* (salvo que la vayas a instalar en una organización).
@@ -161,6 +165,44 @@ Detrás de `src/server/ai/` hay una interfaz `AiProvider`. Para cambiar de model
 
 Los de solo lectura pueden pedir resúmenes, pero no generar contenido. El consumo queda registrado en la tabla `ai_usage`.
 
+## Adjuntos
+
+Cada tarea acepta imágenes PNG, JPG, GIF o WebP de hasta 10 MB (40 por tarea). Se suben con el botón, arrastrando o pegando una captura con ⌘/Ctrl+V mientras la tarea está abierta. El tipo se valida por el contenido del archivo (no por la extensión) y no se aceptan SVG. Los archivos se sirven solo a miembros del proyecto, por sesión o con token de API.
+
+## API para Claude Code (MCP)
+
+ToDoApp expone un servidor [MCP](https://modelcontextprotocol.io) en `APP_URL/api/mcp`. Cada persona crea un **token personal** en el menú de usuario → *Tokens de API*. El token actúa con sus mismos permisos y se puede revocar en cualquier momento.
+
+```bash
+claude mcp add --transport http todoapp https://todo.tudominio.com/api/mcp --header "Authorization: Bearer tda_…"
+```
+
+| Herramienta | Qué hace |
+|---|---|
+| `list_projects` | Proyectos y rol |
+| `get_board` | Columnas con sus tareas |
+| `search_tasks` | Búsqueda por texto, columna, responsable o tag |
+| `get_task` | Detalle con descripción, subtareas, comentarios, adjuntos, ramas y PRs |
+| `create_task` / `update_task` | Crear o editar (responsable por nombre o email; los tags se crean si no existen) |
+| `move_task` | Mover a otra columna por nombre |
+| `add_comment` / `add_attachment` | Comentar o adjuntar una imagen (base64) |
+| `agent_queue`, `agent_claim`, `agent_submit_pr`, `agent_release` | Flujo del agente (ver abajo) |
+
+Los comentarios y cambios hechos por API muestran "vía <nombre del token>". Los errores devuelven las opciones válidas, por ejemplo las columnas existentes cuando se nombra una que no existe.
+
+## Agente Claude
+
+Delegá tareas a Claude poniéndoles un tag (por defecto **IA**):
+
+1. **Ajustes → Agente Claude**: activalo, elegí el tag y la ventana horaria de merge (por defecto 22:00–07:00, en `APP_TIMEZONE`). El proyecto necesita al menos un repositorio conectado.
+2. Creá un token (*Tokens de API*) para el agente y agregá el MCP `todoapp` al entorno de una **rutina programada de Claude Code** sobre el repositorio (`/schedule`), por ejemplo cada hora. Usá como instrucciones el texto que aparece en esa misma pantalla (`src/lib/agent-prompt.ts`).
+3. En cada corrida la rutina:
+   - pide la cola (`agent_queue`): tareas con el tag, sin terminar y sin tomar, con todo su contexto;
+   - agrupa tareas afines en una misma rama (`claude/tda-12-tda-15-…`) y las toma (`agent_claim`), lo que las pasa a "en curso";
+   - implementa, corre los tests, abre un PR y lo registra (`agent_submit_pr`) como **easy** o **large**;
+   - si algo es ambiguo, bloquea la tarea con una pregunta (`agent_release`). La respondés en un comentario y la volvés a la cola desde la tarea.
+4. **Merge:** los PRs *easy* los mergea ToDoApp (no la rutina) dentro de la ventana horaria, solo si GitHub los da por listos (checks en verde, sin conflictos). Los *large* esperan tu revisión. Al mergear a la rama por defecto, el GitHub Action de tu repo despliega. El estado y el último motivo de cada PR se ven en la misma pantalla.
+
 ## Tests
 
 ```bash
@@ -174,6 +216,8 @@ Los tests de integración corren contra una base Postgres real (`todoapp_test`),
 - **Automatizaciones**: motor puro (disparadores, condiciones, bucles, plantillas) y flujos completos, incluido el ejemplo PR abierto → En revisión → mergeado → Hecho con webhooks simulados.
 - **GitHub**: firma de webhooks, idempotencia, vinculación por clave y estados del PR.
 - **IA**: validación de respuestas, permisos y límite de uso (con un proveedor falso).
+- **MCP y agente**: herramientas por un cliente MCP real en memoria, permisos del token, cola, toma de tareas, PRs, ventana horaria y merge automático (con un GitHub falso).
+- **Adjuntos**: detección de tipo por contenido, límites y permisos.
 
 ## Producción con Docker
 

@@ -42,6 +42,28 @@ function describe(entry: Entry) {
           la movió de <b>{show("column", entry.oldValue)}</b> a <b>{show("column", entry.newValue)}</b>
         </>
       );
+    case "attached":
+      return (
+        <>
+          adjuntó <b>{show(null, entry.newValue)}</b>
+        </>
+      );
+    case "detached":
+      return (
+        <>
+          borró el adjunto <b>{show(null, entry.oldValue)}</b>
+        </>
+      );
+    case "agent":
+      return entry.field === "claimed" ? (
+        <>
+          tomó la tarea para el agente en <b>{show(null, entry.newValue)}</b>
+        </>
+      ) : (
+        <>
+          registró el <b>{show(null, entry.newValue)}</b> del agente
+        </>
+      );
     case "linked":
     case "unlinked":
       return (
@@ -86,7 +108,8 @@ export function Activity({ task }: { task: TaskDetail }) {
             <p className="min-w-0 flex-1 text-muted-foreground">
               {entry.actorType === "automation" ? <Bot className="mr-1 inline size-3.5 text-brand" /> : null}
               {entry.actorType === "integration" ? <GitBranch className="mr-1 inline size-3.5" /> : null}
-              <span className="font-medium text-foreground">{actor}</span> {describe(entry)}
+              <span className="font-medium text-foreground">{actor}</span>
+              {entry.via ? <span className="ml-1 rounded bg-muted px-1 text-[10px]">vía {entry.via}</span> : null} {describe(entry)}
               <span className="ml-2 text-xs" title={formatDateTime(entry.createdAt)}>
                 {timeAgo(entry.createdAt)}
               </span>

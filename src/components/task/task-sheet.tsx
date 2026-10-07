@@ -24,6 +24,8 @@ import { parseTaskKey } from "@/lib/domain";
 import { formatDateTime } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { Activity } from "./activity";
+import { AgentBanner } from "./agent-banner";
+import { Attachments } from "./attachments";
 import { Comments } from "./comments";
 import { DescriptionEditor } from "./description-editor";
 import {
@@ -204,12 +206,14 @@ function TaskDetailView({
         <div className="grid gap-6 p-4 @2xl:grid-cols-[1fr_17rem] @2xl:p-6">
           <div className="min-w-0 space-y-6">
             <TitleEditor value={task.title} onSave={(title) => update({ title })} disabled={!canEdit} />
+            <AgentBanner task={task} canEdit={canEdit} />
             <DescriptionEditor
               value={task.descriptionMd}
               onSave={(descriptionMd) => update({ descriptionMd })}
               disabled={!canEdit}
               toolbar={canEdit ? <AiDescriptionActions task={task} onApply={(descriptionMd) => update({ descriptionMd })} /> : null}
             />
+            <Attachments task={task} canEdit={canEdit} />
             {!task.parentId || task.subtasks.length ? (
               <Subtasks
                 task={task}

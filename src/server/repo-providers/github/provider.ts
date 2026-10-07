@@ -7,6 +7,7 @@ import type {
   ProviderInstallation,
   ProviderRepository,
   PullRequestInfo,
+  PullRequestStatus,
   RepoEvent,
   RepoProvider,
   RepoRef,
@@ -232,5 +233,34 @@ export const githubProvider: RepoProvider = {
 
   branchUrl(repo, branch) {
     return `${repo.htmlUrl}/tree/${branch}`;
+  },
+
+  async pullRequestStatus(installationId, repo, number): Promise<PullRequestStatus> {
+    const pr = await asInstallation<GhPullRequest & { mergeable_state?: string }>(
+      installationId,
+      `/repos/${repo.fullName}/pulls/${number}`,
+    );
+    return {
+      state: pr.state,
+      merged: !!(pr.merged || pr.merged_at),
+      draft: !!pr.draft,
+      mergeableState: pr.mergeable_state ?? "unknown",
+      title: pr.title,
+      url: pr.html_url,
+    };
+  },
+
+  async mergePullRequest(installationId, repo, number) {
+    try {
+      const result = await asInstallation<{ merged: boolean; message: string }>(
+        installationId,
+        `/repos/${repo.fullName}/pulls/${number}/merge`,
+        { method: "PUT", body: JSON.stringify({ merge_method: "squash" }) },
+      );
+      return { merged: result.merged, message: result.message };
+    } catch (err) {
+      if (err instanceof GithubApiError) return { merged: false, message: err.message };
+      throw err;
+    }
   },
 };

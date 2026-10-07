@@ -1,4 +1,6 @@
 import * as z from "zod";
+import * as apiTokens from "@/server/services/api-tokens";
+import * as attachments from "@/server/services/attachments";
 import * as board from "@/server/services/board";
 import * as columns from "@/server/services/columns";
 import * as comments from "@/server/services/comments";
@@ -112,4 +114,16 @@ export const sprintRouter = router({
   complete: p.input(sprints.completeSprintSchema).mutation(({ ctx, input }) => sprints.completeSprint(ctx.actor, input)),
   delete: p.input(z.object({ sprintId: id })).mutation(({ ctx, input }) => sprints.deleteSprint(ctx.actor, input.sprintId)),
   moveTask: p.input(sprints.moveInBacklogSchema).mutation(({ ctx, input }) => sprints.moveInBacklog(ctx.actor, input)),
+});
+
+export const attachmentRouter = router({
+  delete: p
+    .input(z.object({ attachmentId: id }))
+    .mutation(({ ctx, input }) => attachments.deleteAttachment(ctx.actor, input.attachmentId)),
+});
+
+export const tokenRouter = router({
+  list: p.query(({ ctx }) => apiTokens.listApiTokens(ctx.user.id)),
+  create: p.input(apiTokens.createTokenSchema).mutation(({ ctx, input }) => apiTokens.createApiToken(ctx.user.id, input)),
+  revoke: p.input(z.object({ tokenId: id })).mutation(({ ctx, input }) => apiTokens.revokeApiToken(ctx.user.id, input.tokenId)),
 });

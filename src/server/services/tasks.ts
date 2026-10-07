@@ -12,6 +12,7 @@ import {
   sprints,
   tags,
   taskActivity,
+  taskAttachments,
   taskTags,
   tasks,
   taskVcsLinks,
@@ -196,11 +197,10 @@ async function bottomBacklogRank(ex: Executor, projectId: string) {
   return rankBetween(row?.rank ?? null, null);
 }
 
-function publishTaskChange(ex: Executor, actor: Actor, projectId: string, taskIds: string[]) {
-  return Promise.all([
-    publish(ex, projectChannel(projectId), { type: "board", taskIds }, actor),
-    ...taskIds.map((taskId) => publish(ex, projectChannel(projectId), { type: "task", taskId }, actor)),
-  ]);
+// En serie: dentro de una transacción todas las queries comparten la misma conexión.
+async function publishTaskChange(ex: Executor, actor: Actor, projectId: string, taskIds: string[]) {
+  await publish(ex, projectChannel(projectId), { type: "board", taskIds }, actor);
+  for (const taskId of taskIds) await publish(ex, projectChannel(projectId), { type: "task", taskId }, actor);
 }
 
 /**
@@ -210,10 +210,8 @@ function publishTaskChange(ex: Executor, actor: Actor, projectId: string, taskId
 async function applyMove(tx: Tx, actor: Actor, task: TaskRow, columnId: string, rank: string) {
   const changes: Partial<TaskRow> = { rank };
   if (columnId !== task.columnId) {
-    const [from, to] = await Promise.all([
-      getColumn(tx, task.projectId, task.columnId),
-      getColumn(tx, task.projectId, columnId),
-    ]);
+    const from = await getColumn(tx, task.projectId, task.columnId);
+    const to = await getColumn(tx, task.projectId, columnId);
     changes.columnId = columnId;
     if (to.category === "done") changes.completedAt = task.completedAt ?? new Date();
     else changes.completedAt = null;
@@ -550,7 +548,7 @@ export async function getTaskDetail(actor: Actor, taskId: string) {
     .from(projects)
     .where(eq(projects.id, task.projectId));
 
-  const [taskTagRows, subtasks, parent, commentRows, activityRows, links] = await Promise.all([
+  const [taskTagRows, subtasks, parent, commentRows, activityRows, links, attachments] = await Promise.all([
     db
       .select({ id: tags.id, name: tags.name, color: tags.color })
       .from(taskTags)
@@ -582,6 +580,7 @@ export async function getTaskDetail(actor: Actor, taskId: string) {
         id: comments.id,
         bodyMd: comments.bodyMd,
         source: comments.source,
+        via: comments.via,
         createdAt: comments.createdAt,
         editedAt: comments.editedAt,
         author: { id: user.id, name: user.name, image: user.image },
@@ -601,6 +600,7 @@ export async function getTaskDetail(actor: Actor, taskId: string) {
         newValue: taskActivity.newValue,
         actorType: taskActivity.actorType,
         actorId: taskActivity.actorId,
+        via: taskActivity.via,
         createdAt: taskActivity.createdAt,
         userName: user.name,
         ruleName: automationRules.name,
@@ -634,6 +634,19 @@ export async function getTaskDetail(actor: Actor, taskId: string) {
       .innerJoin(projectRepositories, eq(projectRepositories.id, taskVcsLinks.projectRepositoryId))
       .where(eq(taskVcsLinks.taskId, task.id))
       .orderBy(desc(taskVcsLinks.updatedAt)),
+    db
+      .select({
+        id: taskAttachments.id,
+        fileName: taskAttachments.fileName,
+        contentType: taskAttachments.contentType,
+        sizeBytes: taskAttachments.sizeBytes,
+        createdAt: taskAttachments.createdAt,
+        uploadedBy: { id: user.id, name: user.name },
+      })
+      .from(taskAttachments)
+      .leftJoin(user, eq(user.id, taskAttachments.uploadedById))
+      .where(eq(taskAttachments.taskId, task.id))
+      .orderBy(asc(taskAttachments.createdAt)),
   ]);
 
   return {
@@ -648,6 +661,7 @@ export async function getTaskDetail(actor: Actor, taskId: string) {
     comments: commentRows,
     activity: activityRows,
     links,
+    attachments: attachments.map((a) => ({ ...a, url: `/api/attachments/${a.id}` })),
   };
 }
 

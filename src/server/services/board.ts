@@ -72,6 +72,8 @@ export async function getBoard(actor: Actor, projectId: string) {
         subtaskTotal: sql<number>`(select count(*) from tasks st where st.parent_id = ${OUTER_TASK_ID} and st.deleted_at is null)`.mapWith(Number),
         subtaskDone: sql<number>`(select count(*) from tasks st where st.parent_id = ${OUTER_TASK_ID} and st.deleted_at is null and st.completed_at is not null)`.mapWith(Number),
         commentCount: sql<number>`(select count(*) from comments c where c.task_id = ${OUTER_TASK_ID})`.mapWith(Number),
+        attachmentCount: sql<number>`(select count(*) from task_attachments a where a.task_id = ${OUTER_TASK_ID})`.mapWith(Number),
+        agentStatus: tasks.agentStatus,
         prState: sql<string | null>`(
           select l.state from task_vcs_links l
           where l.task_id = ${OUTER_TASK_ID} and l.kind = 'pull_request'

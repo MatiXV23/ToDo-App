@@ -49,6 +49,7 @@ export function Comments({ task, canComment, canModerate }: { task: TaskDetail; 
                 <span className="font-medium">
                   {isAutomation ? `Automatización${c.ruleName ? ` · ${c.ruleName}` : ""}` : (c.author?.name ?? "Usuario eliminado")}
                 </span>
+                {c.via ? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">vía {c.via}</span> : null}
                 <span className="text-muted-foreground" title={formatDateTime(c.createdAt)}>
                   {timeAgo(c.createdAt)}
                   {c.editedAt ? " · editado" : ""}

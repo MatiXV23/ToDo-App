@@ -61,6 +61,16 @@ export type ProviderRepository = RepoRef & { defaultBranch: string; private: boo
 
 export type BranchStatus = { exists: boolean; aheadBy: number | null; behindBy: number | null };
 
+export type PullRequestStatus = {
+  state: "open" | "closed";
+  merged: boolean;
+  draft: boolean;
+  /** clean = se puede mergear y los checks pasaron. Otros: blocked, unstable, dirty, behind, unknown. */
+  mergeableState: string;
+  title: string;
+  url: string;
+};
+
 export interface RepoProvider {
   readonly id: string;
   readonly label: string;
@@ -90,4 +100,6 @@ export interface RepoProvider {
     baseBranch: string,
   ): Promise<BranchStatus>;
   branchUrl(repo: { htmlUrl: string }, branch: string): string;
+  pullRequestStatus(installationId: string, repo: { fullName: string }, number: number): Promise<PullRequestStatus>;
+  mergePullRequest(installationId: string, repo: { fullName: string }, number: number): Promise<{ merged: boolean; message: string }>;
 }

@@ -129,6 +129,12 @@ export const projects = pgTable("projects", {
     .references(() => user.id),
   sprintsEnabled: boolean("sprints_enabled").notNull().default(false),
   taskSeq: integer("task_seq").notNull().default(0),
+  /** Agente Claude: toma las tareas con el tag configurado (ver services/agent.ts). */
+  agentEnabled: boolean("agent_enabled").notNull().default(false),
+  agentTagId: uuid("agent_tag_id"),
+  /** Ventana horaria (HH:MM, zona APP_TIMEZONE) en la que se mergean los PRs "fáciles". */
+  agentMergeFrom: text("agent_merge_from").notNull().default("22:00"),
+  agentMergeUntil: text("agent_merge_until").notNull().default("07:00"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   archivedAt: ts("archived_at"),
@@ -259,6 +265,10 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     estimateHours: doublePrecision("estimate_hours"),
     completedAt: ts("completed_at"),
+    /** claimed | pr_open | merged | blocked; null = sin agente o en cola. */
+    agentStatus: text("agent_status"),
+    agentBranch: text("agent_branch"),
+    agentClaimedAt: ts("agent_claimed_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     deletedAt: ts("deleted_at"),
@@ -310,6 +320,8 @@ export const comments = pgTable(
     /** user | automation */
     source: actorType("source").notNull().default("user"),
     automationRuleId: uuid("automation_rule_id"),
+    /** Nombre del token de API si se escribió desde la API/MCP (ej. "Claude"). */
+    via: text("via"),
     bodyMd: text("body_md").notNull(),
     createdAt: createdAt(),
     editedAt: ts("edited_at"),
@@ -334,6 +346,7 @@ export const taskActivity = pgTable(
     field: text("field"),
     oldValue: jsonb("old_value"),
     newValue: jsonb("new_value"),
+    via: text("via"),
     createdAt: createdAt(),
   },
   (t) => [index("task_activity_task_idx").on(t.taskId, t.createdAt)],
@@ -563,4 +576,74 @@ export const aiUsage = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("ai_usage_user_idx").on(t.userId, t.createdAt)],
+);
+
+// ─── Adjuntos ───────────────────────────────────────────────────────────
+
+export const taskAttachments = pgTable(
+  "task_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    uploadedById: text("uploaded_by_id").references(() => user.id, { onDelete: "set null" }),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    /** Nombre del archivo en el almacenamiento (UPLOADS_DIR). */
+    storageKey: text("storage_key").notNull().unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("task_attachments_task_idx").on(t.taskId, t.createdAt)],
+);
+
+// ─── Tokens de API (MCP) ────────────────────────────────────────────────
+
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** SHA-256 del token: el token en claro solo se muestra al crearlo. */
+    tokenHash: text("token_hash").notNull().unique(),
+    prefix: text("prefix").notNull(),
+    lastUsedAt: ts("last_used_at"),
+    createdAt: createdAt(),
+    revokedAt: ts("revoked_at"),
+  },
+  (t) => [index("api_tokens_user_idx").on(t.userId)],
+);
+
+// ─── Agente: PRs abiertos por Claude ────────────────────────────────────
+
+export const agentPullRequests = pgTable(
+  "agent_pull_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    projectRepositoryId: uuid("project_repository_id")
+      .notNull()
+      .references(() => projectRepositories.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    branch: text("branch").notNull(),
+    title: text("title").notNull().default(""),
+    url: text("url").notNull(),
+    /** easy: se mergea solo dentro de la ventana; large: espera revisión humana. */
+    complexity: text("complexity").notNull(),
+    summary: text("summary").notNull().default(""),
+    taskIds: jsonb("task_ids").$type<string[]>().notNull().default([]),
+    /** pending | merged | closed | waiting_review */
+    status: text("status").notNull().default("pending"),
+    lastCheckAt: ts("last_check_at"),
+    lastReason: text("last_reason"),
+    createdAt: createdAt(),
+    mergedAt: ts("merged_at"),
+  },
+  (t) => [unique("agent_pull_requests_uq").on(t.projectRepositoryId, t.number)],
 );

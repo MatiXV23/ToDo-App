@@ -6,8 +6,16 @@ const providers: Record<string, RepoProvider> = {
   [githubProvider.id]: githubProvider,
 };
 
+const overrides = new Map<string, RepoProvider>();
+
+/** Para tests: reemplaza un proveedor (por ejemplo, un GitHub falso). */
+export function setProviderForTests(provider: RepoProvider | null, id = "github") {
+  if (provider) overrides.set(id, provider);
+  else overrides.delete(id);
+}
+
 export function getProvider(id: string): RepoProvider | null {
-  return providers[id] ?? null;
+  return overrides.get(id) ?? providers[id] ?? null;
 }
 
 export function listProviders() {

@@ -1,8 +1,10 @@
 import { router } from "./init";
+import { agentRouter } from "./routers/agent";
 import { aiRouter } from "./routers/ai";
 import { automationRouter } from "./routers/automation";
 import { githubRouter } from "./routers/github";
 import {
+  attachmentRouter,
   boardRouter,
   columnRouter,
   commentRouter,
@@ -13,6 +15,7 @@ import {
   sprintRouter,
   tagRouter,
   taskRouter,
+  tokenRouter,
 } from "./routers/core";
 
 export const appRouter = router({
@@ -26,9 +29,12 @@ export const appRouter = router({
   tag: tagRouter,
   epic: epicRouter,
   sprint: sprintRouter,
+  attachment: attachmentRouter,
+  token: tokenRouter,
   automation: automationRouter,
   github: githubRouter,
   ai: aiRouter,
+  agent: agentRouter,
 });
 
 export type AppRouter = typeof appRouter;

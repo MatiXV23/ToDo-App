@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useProject } from "@/components/project/project-context";
 import { cn } from "@/lib/utils";
+import { AgentSettings } from "./agent-settings";
 import { ColumnsSettings } from "./columns-settings";
 import { GeneralSettings } from "./general-settings";
 import { GithubSettings } from "./github-settings";
@@ -16,6 +17,7 @@ const SECTIONS = [
   { id: "columns", label: "Columnas" },
   { id: "tags", label: "Tags" },
   { id: "github", label: "GitHub" },
+  { id: "agent", label: "Agente Claude" },
 ] as const;
 
 type Section = (typeof SECTIONS)[number]["id"];
@@ -48,6 +50,7 @@ export function SettingsView() {
         {section === "columns" ? <ColumnsSettings project={project} /> : null}
         {section === "tags" ? <TagsSettings project={project} /> : null}
         {section === "github" ? <GithubSettings project={project} /> : null}
+        {section === "agent" ? <AgentSettings project={project} /> : null}
       </div>
     </div>
   );

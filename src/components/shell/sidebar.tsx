@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, KanbanSquare, LayoutGrid, LogOut, Plus } from "lucide-react";
+import { Inbox, KanbanSquare, KeyRound, LayoutGrid, LogOut, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -102,6 +102,11 @@ export function Sidebar() {
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/settings/tokens">
+                <KeyRound /> Tokens de API (Claude Code)
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={async () => {
                 await authClient.signOut();

@@ -16,6 +16,7 @@ import { getProvider, type RepoEvent } from "@/server/repo-providers";
 import type { IncomingWebhook, ProviderInstallation, PullRequestInfo } from "@/server/repo-providers/types";
 import type { PrState } from "@/lib/domain";
 import { logActivity } from "./activity";
+import { onPullRequestClosed } from "./agent";
 import { loadTask } from "./tasks";
 
 // ─── Vinculación por clave de tarea ─────────────────────────────────────
@@ -305,6 +306,9 @@ export async function applyRepoEvent(provider: string, event: RepoEvent) {
         case "pull_request.merged":
         case "pull_request.closed":
           await applyPullRequest(tx, provider, repo, event.kind, event.pr, affected);
+          if (event.kind === "pull_request.merged" || event.kind === "pull_request.closed") {
+            await onPullRequestClosed(repo.id, event.pr.number, event.kind === "pull_request.merged");
+          }
           break;
       }
     }

@@ -4,6 +4,7 @@ import { automationRules, automationRuns, domainEvents, dueReminders, tasks, web
 import { env } from "@/server/env";
 import { runRule } from "@/server/automations/executor";
 import { triggerSchema } from "@/lib/automation-schema";
+import { runAgentAutoMerge } from "@/server/services/agent";
 import { notify } from "@/server/services/notifications";
 
 /**
@@ -86,6 +87,7 @@ let lastCleanup = 0;
 export async function runScheduledJobs() {
   await runDueSoonRules();
   await notifyDueSoon();
+  await runAgentAutoMerge();
   if (Date.now() - lastCleanup > 6 * 60 * 60_000) {
     lastCleanup = Date.now();
     await cleanup();

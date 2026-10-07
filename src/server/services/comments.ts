@@ -27,6 +27,7 @@ export async function addComment(actor: Actor, input: z.input<typeof addCommentS
         authorId: actorUserId(actor),
         source: actor.type === "automation" ? "automation" : actor.type === "user" ? "user" : "system",
         automationRuleId: actor.type === "automation" ? actor.ruleId : null,
+        via: actor.type === "user" ? (actor.via ?? null) : null,
       })
       .returning();
 

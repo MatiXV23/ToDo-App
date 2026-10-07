@@ -28,7 +28,10 @@ RUN npm run build \
 FROM base AS runtime
 ENV NODE_ENV=production \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    UPLOADS_DIR=/data/uploads
+# Adjuntos: el volumen montado acá hereda el dueño "node".
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
