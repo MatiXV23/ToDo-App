@@ -4,6 +4,7 @@ import { aiRouter } from "./routers/ai";
 import { automationRouter } from "./routers/automation";
 import { githubRouter } from "./routers/github";
 import {
+  accessRouter,
   attachmentRouter,
   boardRouter,
   columnRouter,
@@ -35,6 +36,7 @@ export const appRouter = router({
   github: githubRouter,
   ai: aiRouter,
   agent: agentRouter,
+  access: accessRouter,
 });
 
 export type AppRouter = typeof appRouter;

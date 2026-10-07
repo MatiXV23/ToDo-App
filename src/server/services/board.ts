@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { boardColumns, epics, projectMembers, projects, sprints, tags, tasks, user } from "@/server/db/schema";
 import { notFound } from "@/server/errors";
@@ -10,6 +10,7 @@ import { type Actor, authorize } from "@/server/permissions/access";
  * `${tasks.id}` como "id" a secas, que dentro de la subconsulta apuntaría a su propia tabla.
  */
 const OUTER_TASK_ID = sql.raw('"tasks"."id"');
+const OUTER_COLUMN_ID = sql.raw('"board_columns"."id"');
 
 /**
  * Todo lo que necesita el tablero en una sola consulta lógica. Con sprints activados
@@ -36,7 +37,14 @@ export async function getBoard(actor: Actor, projectId: string) {
   }
 
   const [columns, members, tagRows, epicRows, plannedSprints, taskRows] = await Promise.all([
-    db.select().from(boardColumns).where(eq(boardColumns.projectId, projectId)).orderBy(asc(boardColumns.rank)),
+    db
+      .select({
+        ...getTableColumns(boardColumns),
+        autoTagIds: sql<string[]>`coalesce((select array_agg(ct.tag_id) from board_column_tags ct where ct.column_id = ${OUTER_COLUMN_ID}), '{}')`,
+      })
+      .from(boardColumns)
+      .where(eq(boardColumns.projectId, projectId))
+      .orderBy(asc(boardColumns.rank)),
     db
       .select({ id: user.id, name: user.name, email: user.email, image: user.image, role: projectMembers.role })
       .from(projectMembers)

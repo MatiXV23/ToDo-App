@@ -10,7 +10,8 @@ export type NotificationType =
   | "assigned"
   | "comment"
   | "due_soon"
-  | "removed_from_project";
+  | "removed_from_project"
+  | "access_request";
 
 export async function notify(
   ex: Executor,

@@ -2,8 +2,9 @@
 
 Tablero de tareas estilo Scrum/Kanban, pensado para uso personal con colaboración puntual. Más liviano que Jira: lo justo para trabajar rápido.
 
+- **Acceso por aprobación**: se entra con Google, pero solo quien aprueba el administrador.
 - **Proyectos → Epics → Tareas → Subtareas**, con roles (dueño, editor, solo lectura) e invitaciones dentro de la app.
-- **Tablero** con columnas configurables, arrastrar y soltar, filtros, búsqueda y cambios en **tiempo real**.
+- **Tablero** con columnas configurables (incluso con **tags automáticos**), arrastrar y soltar, filtros, búsqueda y cambios en **tiempo real**.
 - **Sprints opcionales** con backlog, sprint activo y cierre de sprint.
 - **GitHub**: ramas, commits y PRs vinculados por la clave de la tarea (`TDA-12`), crear ramas desde la tarea, estado del PR.
 - **Automatizaciones** "cuando ocurre X, si se cumple Y, hacer Z", con registro de cada ejecución y su motivo.
@@ -11,6 +12,7 @@ Tablero de tareas estilo Scrum/Kanban, pensado para uso personal con colaboraci�
 - **Buzón** de notificaciones: invitaciones, asignaciones, comentarios y vencimientos.
 - **Adjuntos**: imágenes en las tareas como evidencia o referencia (arrastrar, pegar o elegir).
 - **API MCP** para que Claude Code vea, cree, mueva y comente tareas con un token personal.
+- **App instalable (PWA)** en el celular o la compu, con página propia sin conexión.
 - **Agente Claude**: las tareas con el tag de IA las implementa una rutina de Claude Code, que abre PRs; los cambios chicos se mergean solos en una ventana horaria.
 
 ## Stack
@@ -88,6 +90,7 @@ Mientras no configures Google, en desarrollo hay un **login de prueba** (usuario
 | `DATABASE_URL_TEST` | tests | Base que usan los tests de integración (se borra en cada corrida). |
 | `BETTER_AUTH_SECRET` | sí | Secreto de sesiones: `openssl rand -base64 32`. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | sí | Credenciales OAuth de Google. |
+| `ADMIN_EMAILS` | no | Emails administradores (separados por coma): aprueban quién entra a la app. Por defecto `matiperezgordano@gmail.com`. |
 | `DEV_LOGIN_ENABLED` | no | `true` habilita el login de prueba (solo fuera de producción). |
 | `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | para GitHub | Datos de la GitHub App. Sin ellos la integración aparece como "no configurada". |
 | `AI_PROVIDER` | no | `deepseek` (por defecto) u `openai`. Cualquier API compatible con OpenAI sirve. |
@@ -107,6 +110,16 @@ Mientras no configures Google, en desarrollo hay un **login de prueba** (usuario
 6. Copiá el ID y el secreto a `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`, y reiniciá la app.
 
 Google no acepta IPs privadas como redirección: fuera de `localhost` hace falta un dominio con HTTPS.
+
+## Acceso a la app
+
+Iniciar sesión con Google no alcanza: solo entran los emails que aprueba un administrador (`ADMIN_EMAILS`).
+
+- Si alguien sin acceso entra con Google, no se crea su usuario: queda una **solicitud pendiente**, el admin recibe un aviso en el buzón y la persona ve "Tu solicitud de acceso está pendiente".
+- El admin gestiona todo en **Acceso a la app** (barra lateral, solo visible para admins): aprobar o rechazar solicitudes, dar acceso por adelantado a un email y quitar el acceso (cierra sus sesiones y deja de aceptar sus tokens de API).
+- Si el admin invita a alguien a un proyecto, esa persona queda aprobada. Las invitaciones de otros miembros, en cambio, siguen necesitando la aprobación del admin (la solicitud muestra a qué proyecto la invitaron).
+- Quienes ya eran usuarios al instalar esta versión conservan el acceso. Los administradores siempre pueden entrar.
+- El login de desarrollo (`DEV_LOGIN_ENABLED`) no pasa por la aprobación.
 
 ## Configurar la integración con GitHub
 
@@ -190,9 +203,18 @@ claude mcp add --transport http todoapp https://todo.tudominio.com/api/mcp --hea
 
 Los comentarios y cambios hechos por API muestran "vía <nombre del token>". Los errores devuelven las opciones válidas, por ejemplo las columnas existentes cuando se nombra una que no existe.
 
+## Instalar como app (PWA)
+
+ToDoApp se puede instalar y abre en su propia ventana, sin barra del navegador:
+
+- **Android / Chrome / Edge:** el navegador ofrece "Instalar app" (o desde el menú de usuario de la barra lateral → *Instalar app*).
+- **iPhone / iPad:** en Safari, *Compartir → Agregar a inicio*.
+
+El service worker (`public/sw.js`) no guarda páginas ni datos: todo es privado y en tiempo real. Solo muestra `public/offline.html` si no hay conexión. Los íconos se generan desde el logo (`src/app/pwa/[icon]/route.tsx`) y el manifest está en `src/app/manifest.ts`. Para instalarla hace falta HTTPS (o `localhost`).
+
 ## Agente Claude
 
-Delegá tareas a Claude poniéndoles un tag (por defecto **IA**):
+Delegá tareas a Claude poniéndoles un tag (por defecto **IA**). Para no tener que acordarte del tag, creá una columna "IA" y en **Ajustes → Columnas** asignale el tag como **tag automático**: toda tarea que se cree en esa columna o se mueva a ella lo recibe (y las que ya estaban, al configurarlo). Al sacar la tarea de la columna el tag queda, para que el agente la siga.
 
 1. **Ajustes → Agente Claude**: activalo, elegí el tag y la ventana horaria de merge (por defecto 22:00–07:00, en `APP_TIMEZONE`). El proyecto necesita al menos un repositorio conectado.
 2. Creá un token (*Tokens de API*) para el agente y agregá el MCP `todoapp` al entorno de una **rutina programada de Claude Code** sobre el repositorio (`/schedule`), por ejemplo cada hora. Usá como instrucciones el texto que aparece en esa misma pantalla (`src/lib/agent-prompt.ts`).

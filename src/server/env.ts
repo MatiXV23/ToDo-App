@@ -11,6 +11,13 @@ export const env = {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     return clientId && clientSecret ? { clientId, clientSecret } : null;
   },
+  /** Emails con acceso de administrador: aprueban quién puede entrar a la app. */
+  get adminEmails() {
+    return (process.env.ADMIN_EMAILS ?? "matiperezgordano@gmail.com")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+  },
   /** Login sin Google para desarrollo y tests. Nunca activo en producción. */
   get devLoginEnabled() {
     return process.env.NODE_ENV !== "production" && process.env.DEV_LOGIN_ENABLED === "true";

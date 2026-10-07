@@ -2,6 +2,8 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { TagChip } from "@/components/common/chips";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Board } from "./filters";
 import { QuickAdd } from "./quick-add";
@@ -20,6 +22,7 @@ type Props = {
 
 export function BoardColumn({ column, taskIds, lookups, canEdit, canCreate, projectId, sprintId, onOpen }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: "column" } });
+  const autoTags = column.autoTagIds.map((id) => lookups.tags.get(id)).filter((t) => !!t);
   return (
     <section className="flex max-h-full w-72 shrink-0 flex-col rounded-xl bg-muted/50">
       <header className="flex items-center gap-2 px-3 pt-3 pb-2">
@@ -33,6 +36,20 @@ export function BoardColumn({ column, taskIds, lookups, canEdit, canCreate, proj
         />
         <h2 className="truncate text-xs font-semibold tracking-wide text-muted-foreground uppercase">{column.name}</h2>
         <span className="text-xs text-muted-foreground">{taskIds.length}</span>
+        {autoTags.length ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="ml-auto flex min-w-0 shrink items-center gap-1 overflow-hidden">
+                {autoTags.map((t) => (
+                  <TagChip key={t.id} tag={t} />
+                ))}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              Las tareas que se crean acá o entran a esta columna reciben {autoTags.length > 1 ? "estos tags" : "este tag"}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
       </header>
       <div
         ref={setNodeRef}

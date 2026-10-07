@@ -52,6 +52,7 @@ export const invitationStatus = pgEnum("invitation_status", [
 ]);
 export const vcsLinkKind = pgEnum("vcs_link_kind", ["branch", "commit", "pull_request"]);
 export const automationRunStatus = pgEnum("automation_run_status", ["success", "skipped", "failed"]);
+export const accessStatus = pgEnum("access_status", ["pending", "approved", "denied"]);
 
 // ─── Better Auth ────────────────────────────────────────────────────────
 
@@ -115,6 +116,27 @@ export const verification = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
+);
+
+/**
+ * Quién puede entrar a la app. Solo inician sesión los emails aprobados (o los admins de
+ * ADMIN_EMAILS); el resto deja una solicitud pendiente que el admin aprueba o rechaza.
+ */
+export const appAccess = pgTable(
+  "app_access",
+  {
+    email: text("email").primaryKey(),
+    status: accessStatus("status").notNull(),
+    /** Datos de Google al pedir acceso (la persona todavía no es usuario). */
+    name: text("name"),
+    image: text("image"),
+    requestedAt: ts("requested_at"),
+    decidedAt: ts("decided_at"),
+    decidedById: text("decided_by_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("app_access_status_idx").on(t.status)],
 );
 
 // ─── Proyectos y acceso ─────────────────────────────────────────────────
@@ -294,6 +316,20 @@ export const tags = pgTable(
     createdAt: createdAt(),
   },
   (t) => [unique("tags_project_name_uq").on(t.projectId, t.name)],
+);
+
+/** Tags que se agregan solos a las tareas que se crean en la columna o entran a ella. */
+export const boardColumnTags = pgTable(
+  "board_column_tags",
+  {
+    columnId: uuid("column_id")
+      .notNull()
+      .references(() => boardColumns.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.columnId, t.tagId] }), index("board_column_tags_tag_idx").on(t.tagId)],
 );
 
 export const taskTags = pgTable(

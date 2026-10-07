@@ -194,12 +194,14 @@ export function TagsField({
   onChange,
   disabled,
   canCreate,
+  emptyLabel = "Sin tags",
 }: {
   board: Lookups;
   value: string[];
   onChange: (ids: string[]) => void;
   disabled?: boolean;
   canCreate?: boolean;
+  emptyLabel?: string;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -253,7 +255,7 @@ export function TagsField({
             ))}
           </span>
         ) : (
-          "Sin tags"
+          emptyLabel
         )}
       </FieldButton>
     </OptionPicker>

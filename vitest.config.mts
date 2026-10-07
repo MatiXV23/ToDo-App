@@ -31,6 +31,7 @@ export default defineConfig({
           env: {
             DATABASE_URL: testDatabaseUrl,
             DEV_LOGIN_ENABLED: "false",
+            ADMIN_EMAILS: "admin@test.local",
             GITHUB_WEBHOOK_SECRET: "test-webhook-secret",
             AI_API_KEY: "",
           },

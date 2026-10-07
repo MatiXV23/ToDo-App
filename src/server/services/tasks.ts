@@ -24,6 +24,7 @@ import { type Actor, actorUserId, authorize } from "@/server/permissions/access"
 import { PRIORITIES, taskKey } from "@/lib/domain";
 import { rankBetween } from "@/lib/rank";
 import { type ActivityEntry, logActivity } from "./activity";
+import { applyColumnTags, columnTagIds } from "./column-tags";
 import { notify } from "./notifications";
 
 // ─── Esquemas ───────────────────────────────────────────────────────────
@@ -225,6 +226,7 @@ async function applyMove(tx: Tx, actor: Actor, task: TaskRow, columnId: string, 
         newValue: { id: to.id, label: to.name },
       },
     ]);
+    await applyColumnTags(tx, actor, to, [task.id]);
     await emitDomainEvent(tx, {
       projectId: task.projectId,
       type: "task.moved",
@@ -285,8 +287,10 @@ export async function createTask(actor: Actor, input: z.input<typeof createTaskS
       })
       .returning();
 
-    if (refs.tags?.length) {
-      await tx.insert(taskTags).values(refs.tags.map((t) => ({ taskId: task.id, tagId: t.id })));
+    // Tags elegidos más los automáticos de la columna.
+    const tagIds = new Set([...(refs.tags ?? []).map((t) => t.id), ...(await columnTagIds(tx, column.id))]);
+    if (tagIds.size) {
+      await tx.insert(taskTags).values([...tagIds].map((tagId) => ({ taskId: task.id, tagId })));
     }
     await logActivity(tx, actor, [{ taskId: task.id, projectId: task.projectId, kind: "created" }]);
     await emitDomainEvent(tx, {

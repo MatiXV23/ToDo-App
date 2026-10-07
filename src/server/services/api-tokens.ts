@@ -4,6 +4,7 @@ import * as z from "zod";
 import { db } from "@/server/db";
 import { apiTokens, user } from "@/server/db/schema";
 import { notFound } from "@/server/errors";
+import { hasAccess } from "./access";
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -51,7 +52,8 @@ export async function authenticateApiToken(token: string) {
     .from(apiTokens)
     .innerJoin(user, eq(user.id, apiTokens.userId))
     .where(and(eq(apiTokens.tokenHash, hash(token)), isNull(apiTokens.revokedAt)));
-  if (!row) return null;
+  // Si el admin le quitó el acceso a la app, sus tokens dejan de funcionar.
+  if (!row || !(await hasAccess(row.email))) return null;
   // Último uso, como mucho una escritura por minuto.
   await db
     .update(apiTokens)

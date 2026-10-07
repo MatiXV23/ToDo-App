@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/server/db";
-import { boardColumns, projectMembers, user } from "@/server/db/schema";
+import { appAccess, boardColumns, projectMembers, user } from "@/server/db/schema";
 import type { Role } from "@/server/permissions";
 import type { Actor } from "@/server/permissions/access";
 import { createProject } from "@/server/services/projects";
@@ -14,6 +14,7 @@ export async function createUser(name = `Usuario ${++counter}`): Promise<TestUse
   const id = randomUUID();
   const email = `${name.toLowerCase().replace(/\s+/g, ".")}.${id.slice(0, 6)}@test.local`;
   await db.insert(user).values({ id, name, email, emailVerified: true });
+  await db.insert(appAccess).values({ email, status: "approved" });
   return { id, name, email };
 }
 

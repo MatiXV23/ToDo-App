@@ -1,4 +1,5 @@
 import * as z from "zod";
+import * as access from "@/server/services/access";
 import * as apiTokens from "@/server/services/api-tokens";
 import * as attachments from "@/server/services/attachments";
 import * as board from "@/server/services/board";
@@ -126,4 +127,10 @@ export const tokenRouter = router({
   list: p.query(({ ctx }) => apiTokens.listApiTokens(ctx.user.id)),
   create: p.input(apiTokens.createTokenSchema).mutation(({ ctx, input }) => apiTokens.createApiToken(ctx.user.id, input)),
   revoke: p.input(z.object({ tokenId: id })).mutation(({ ctx, input }) => apiTokens.revokeApiToken(ctx.user.id, input.tokenId)),
+});
+
+export const accessRouter = router({
+  list: p.query(({ ctx }) => access.listAccess(ctx.actor)),
+  pendingCount: p.query(({ ctx }) => access.pendingAccessCount(ctx.actor)),
+  decide: p.input(access.decideAccessSchema).mutation(({ ctx, input }) => access.decideAccess(ctx.actor, input)),
 });

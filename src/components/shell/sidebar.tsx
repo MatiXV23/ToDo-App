@@ -1,10 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, KanbanSquare, KeyRound, LayoutGrid, LogOut, Plus } from "lucide-react";
+import { Download, Inbox, KeyRound, LayoutGrid, LogOut, Plus, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { Logo } from "@/components/common/logo";
 import { UserAvatar } from "@/components/common/user-avatar";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
+import { promptInstall, useCanInstall } from "@/lib/pwa";
 import { useTRPC } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "./current-user";
@@ -41,16 +43,16 @@ export function Sidebar() {
   const router = useRouter();
   const trpc = useTRPC();
   const [creating, setCreating] = useState(false);
+  const canInstall = useCanInstall();
   const projects = useQuery(trpc.project.list.queryOptions());
   const unread = useQuery(trpc.notification.unreadCount.queryOptions());
+  const pendingAccess = useQuery(trpc.access.pendingCount.queryOptions(undefined, { enabled: user.isAdmin }));
   const active = (projects.data ?? []).filter((p) => !p.archivedAt);
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-12 items-center gap-2 px-4">
-        <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <KanbanSquare className="size-3.5" />
-        </div>
+        <Logo className="size-6" />
         <span className="text-sm font-semibold">ToDoApp</span>
       </div>
 
@@ -66,6 +68,16 @@ export function Sidebar() {
             </span>
           ) : null}
         </NavLink>
+        {user.isAdmin ? (
+          <NavLink href="/admin/access" active={pathname === "/admin/access"}>
+            <ShieldCheck className="size-4" /> Acceso a la app
+            {pendingAccess.data ? (
+              <span className="ml-auto rounded-full bg-brand px-1.5 text-[11px] font-medium leading-5 text-white">
+                {pendingAccess.data}
+              </span>
+            ) : null}
+          </NavLink>
+        ) : null}
       </nav>
 
       <div className="mt-6 flex items-center justify-between px-4">
@@ -107,6 +119,11 @@ export function Sidebar() {
                 <KeyRound /> Tokens de API (Claude Code)
               </Link>
             </DropdownMenuItem>
+            {canInstall ? (
+              <DropdownMenuItem onSelect={() => void promptInstall()}>
+                <Download /> Instalar app
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
               onSelect={async () => {
                 await authClient.signOut();

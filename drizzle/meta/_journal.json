@@ -15,6 +15,13 @@
       "when": 1791388394132,
       "tag": "0001_attachments_tokens_agent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791390688822,
+      "tag": "0002_access_column_tags",
+      "breakpoints": true
     }
   ]
 }

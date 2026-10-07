@@ -3,6 +3,7 @@
 import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useRealtime } from "@/hooks/use-realtime";
@@ -39,6 +40,7 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
             <Button variant="ghost" size="icon-sm" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">
               <Menu />
             </Button>
+            <Logo className="size-5" />
             <span className="text-sm font-semibold">ToDoApp</span>
           </div>
           <main className="min-h-0 flex-1 overflow-auto">{children}</main>

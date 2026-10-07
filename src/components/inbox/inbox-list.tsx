@@ -1,7 +1,18 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AtSign, Bell, CalendarClock, CheckCheck, Inbox, MessageSquare, UserMinus, UserPlus, UserRoundCheck } from "lucide-react";
+import {
+  AtSign,
+  Bell,
+  CalendarClock,
+  CheckCheck,
+  Inbox,
+  MessageSquare,
+  ShieldEllipsis,
+  UserMinus,
+  UserPlus,
+  UserRoundCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/common/empty-state";
 import { UserAvatar } from "@/components/common/user-avatar";
@@ -23,7 +34,17 @@ const ICONS: Record<string, typeof Bell> = {
   comment: MessageSquare,
   due_soon: CalendarClock,
   removed_from_project: UserMinus,
+  access_request: ShieldEllipsis,
 };
+
+type AccessRequestData = { email?: string; name?: string | null; image?: string | null };
+
+/** Quien pidió acceso todavía no es usuario: sus datos vienen en la notificación. */
+function avatarOf(n: Notification) {
+  if (n.actor || n.type !== "access_request") return n.actor;
+  const data = n.data as AccessRequestData;
+  return { name: data.name || data.email || "?", image: data.image ?? null };
+}
 
 function describe(n: Notification): { text: React.ReactNode; href: string | null } {
   const actor = <span className="font-medium">{n.actor?.name ?? "Alguien"}</span>;
@@ -74,6 +95,18 @@ function describe(n: Notification): { text: React.ReactNode; href: string | null
       };
     case "removed_from_project":
       return { text: <>{actor} te quitó de un proyecto.</>, href: null };
+    case "access_request": {
+      const req = n.data as AccessRequestData;
+      return {
+        text: (
+          <>
+            <span className="font-medium">{req.name || req.email}</span>
+            {req.name ? <span className="text-muted-foreground"> ({req.email})</span> : null} pidió acceso a ToDoApp.
+          </>
+        ),
+        href: "/admin/access",
+      };
+    }
     default:
       return { text: n.type, href: null };
   }
@@ -116,7 +149,7 @@ export function InboxList() {
             const body = (
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="relative mt-0.5">
-                  <UserAvatar user={n.actor} className="size-7" />
+                  <UserAvatar user={avatarOf(n)} className="size-7" />
                   <span className="absolute -right-1 -bottom-1 rounded-full border bg-background p-0.5">
                     <Icon className="size-2.5 text-muted-foreground" />
                   </span>

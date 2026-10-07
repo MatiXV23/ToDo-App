@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import * as z from "zod";
 import { db } from "@/server/db";
 import {
+  appAccess,
   notifications,
   projectInvitations,
   projectMembers,
@@ -13,6 +14,7 @@ import { conflict, forbidden, notFound, badRequest } from "@/server/errors";
 import { projectChannel, publish, userChannel } from "@/server/events";
 import { type Actor, authorize } from "@/server/permissions/access";
 import { can } from "@/server/permissions";
+import { isAdminEmail } from "./access";
 import { notify } from "./notifications";
 
 export const inviteSchema = z.object({
@@ -81,6 +83,20 @@ export async function inviteMember(actor: Actor, input: z.input<typeof inviteSch
       .onConflictDoNothing()
       .returning();
     if (!invitation) throw conflict("Ya hay una invitación pendiente para ese email");
+
+    // Si invita el admin, la persona queda con acceso a la app para poder aceptarla.
+    const [inviter] = await tx.select({ email: user.email }).from(user).where(eq(user.id, me.userId));
+    if (inviter && isAdminEmail(inviter.email) && !isAdminEmail(email)) {
+      const now = new Date();
+      await tx
+        .insert(appAccess)
+        .values({ email, status: "approved", decidedAt: now, decidedById: me.userId })
+        .onConflictDoUpdate({
+          target: appAccess.email,
+          set: { status: "approved", decidedAt: now, decidedById: me.userId },
+          setWhere: sql`${appAccess.status} <> 'approved'`,
+        });
+    }
 
     if (existingUser) {
       await notify(tx, {

@@ -72,6 +72,8 @@ export function useRealtime(projectId?: string) {
           schedule("notification", () => {
             void queryClient.invalidateQueries(trpc.notification.pathFilter());
             void queryClient.invalidateQueries(trpc.member.myInvitations.pathFilter());
+            // Solicitudes de acceso a la app (solo las ve el admin).
+            void queryClient.invalidateQueries(trpc.access.pathFilter());
           });
           break;
         case "projects":
