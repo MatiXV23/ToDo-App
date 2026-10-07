@@ -52,3 +52,6 @@ next-env.d.ts
 
 # adjuntos subidos en desarrollo
 /uploads
+
+# permisos locales de Claude Code
+.claude/settings.local.json
