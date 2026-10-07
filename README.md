@@ -120,7 +120,7 @@ La integración usa una **GitHub App** (permisos acotados y webhooks incluidos).
    - **Webhook**: activo. URL `APP_URL/api/webhooks/github` y un **Webhook secret** (por ejemplo `openssl rand -hex 32`).
 3. **Permisos de repositorio**:
    - *Contents*: **Read and write** (crear ramas y comparar contra la base).
-   - *Pull requests*: **Read and write** (consultar el estado y mergear los PRs del agente).
+   - *Pull requests*: **Read-only** (estado de los PRs; el merge automático usa el permiso de *Contents*).
    - *Metadata*: Read-only (obligatorio).
 4. **Eventos a los que suscribirse**: *Create*, *Delete*, *Push*, *Pull request*, *Pull request review*. Los de instalación llegan solos.
 5. **Where can this GitHub App be installed?**: *Only on this account* (salvo que la vayas a instalar en una organización).
