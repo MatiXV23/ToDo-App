@@ -6,13 +6,14 @@ import path from "node:path";
 const KEY_RE = /^[0-9a-f-]{36}\.(png|jpg|gif|webp)$/;
 
 function uploadsDir() {
-  return process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
+  return process.env.UPLOADS_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), "uploads");
 }
 
 function resolveKey(key: string) {
   // Las claves las genera el servidor; igual se validan para evitar rutas arbitrarias.
   if (!KEY_RE.test(key)) throw new Error("Clave de archivo inválida");
-  return path.join(uploadsDir(), key);
+  // turbopackIgnore: la carpeta se define en runtime; sin esto el build trazaría todo el proyecto.
+  return path.join(/* turbopackIgnore: true */ uploadsDir(), key);
 }
 
 export async function saveFile(key: string, data: Buffer) {
