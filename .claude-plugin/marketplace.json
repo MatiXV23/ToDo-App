@@ -1,0 +1,12 @@
+{
+  "name": "todoapp",
+  "description": "Conector de ToDoApp para Claude Code",
+  "owner": { "name": "Matías Pérez" },
+  "plugins": [
+    {
+      "name": "todoapp",
+      "source": "./claude-plugin",
+      "description": "Crea proyectos de ToDoApp, los vincula a repos git y trabaja sus tareas desde Claude Code"
+    }
+  ]
+}

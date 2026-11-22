@@ -11,7 +11,7 @@ Tablero de tareas estilo Scrum/Kanban, pensado para uso personal con colaboraci�
 - **IA** (DeepSeek) como sugerencia que siempre se revisa antes de aplicar.
 - **Buzón** de notificaciones: invitaciones, asignaciones, comentarios y vencimientos.
 - **Adjuntos**: imágenes en las tareas como evidencia o referencia (arrastrar, pegar o elegir).
-- **API MCP** para que Claude Code vea, cree, mueva y comente tareas con un token personal.
+- **API MCP y conector para Claude Code**: Claude crea proyectos, los vincula a tus repos git y ve, crea, mueve y comenta tareas con un token personal.
 - **App instalable (PWA)** en el celular o la compu, con página propia sin conexión.
 - **Agente Claude**: las tareas con el tag de IA las implementa una rutina de Claude Code, que abre PRs; los cambios chicos se mergean solos en una ventana horaria.
 
@@ -182,9 +182,27 @@ Los de solo lectura pueden pedir resúmenes, pero no generar contenido. El consu
 
 Cada tarea acepta imágenes PNG, JPG, GIF o WebP de hasta 10 MB (40 por tarea). Se suben con el botón, arrastrando o pegando una captura con ⌘/Ctrl+V mientras la tarea está abierta. El tipo se valida por el contenido del archivo (no por la extensión) y no se aceptan SVG. Los archivos se sirven solo a miembros del proyecto, por sesión o con token de API.
 
+## Conector para Claude Code
+
+El plugin `todoapp` (carpeta [`claude-plugin/`](claude-plugin)) deja a Claude crear proyectos de ToDoApp y vincularlos con cualquier repo git en el que estés trabajando. Se instala una vez y sirve en todos tus repos:
+
+```bash
+claude plugin install todoapp --marketplace MatiXV23/ToDo-App
+```
+
+Al instalarlo pide la **URL** de ToDoApp y un **token personal** (menú de usuario → *Tokens de API*); el token se guarda en el llavero, no en `settings.json`. Para cambiarlos: `claude plugin configure todoapp@todoapp`.
+
+En cualquier repo:
+
+- **`/todoapp:conectar [clave o nombre]`**: toma el remoto de `git`, busca si algún proyecto ya tiene ese repo y, si no, crea uno (la clave se deriva del nombre) y le conecta el repo de GitHub. Deja un `.todoapp.json` en la raíz (`{"project": "WEB", …}`) que conviene commitear. Si la GitHub App de ToDoApp no tiene acceso al repo, Claude te pasa el enlace para instalarla y reintenta.
+- **`/todoapp:tarea WEB-12`**: lee la tarea, la pasa a *En curso*, crea la rama `web-12-…`, implementa y al terminar comenta y la deja en revisión (el push y el PR, solo si lo confirmás).
+- Al abrir una sesión en un repo con `.todoapp.json`, un hook le avisa a Claude a qué proyecto pertenece y la convención de ramas y PRs (`WEB-12: …`), así lo que hace se vincula solo a las tareas.
+
+Las herramientas son las del servidor MCP de abajo. Para probar cambios del plugin sin instalarlo: `claude --plugin-dir ./claude-plugin`, y `claude plugin validate ./claude-plugin` antes de publicar.
+
 ## API para Claude Code (MCP)
 
-ToDoApp expone un servidor [MCP](https://modelcontextprotocol.io) en `APP_URL/api/mcp`. Cada persona crea un **token personal** en el menú de usuario → *Tokens de API*. El token actúa con sus mismos permisos y se puede revocar en cualquier momento.
+ToDoApp expone un servidor [MCP](https://modelcontextprotocol.io) en `APP_URL/api/mcp`. Cada persona crea un **token personal** en el menú de usuario → *Tokens de API*. El token actúa con sus mismos permisos y se puede revocar en cualquier momento. El plugin de arriba ya lo configura; a mano sería:
 
 ```bash
 claude mcp add --transport http todoapp https://todo.tudominio.com/api/mcp --header "Authorization: Bearer tda_…"
@@ -193,6 +211,9 @@ claude mcp add --transport http todoapp https://todo.tudominio.com/api/mcp --hea
 | Herramienta | Qué hace |
 |---|---|
 | `list_projects` | Proyectos y rol |
+| `create_project` | Crear un proyecto (clave derivada del nombre si no se indica) y, opcionalmente, conectarle un repo |
+| `connect_repository` / `list_repositories` | Conectar un repo de GitHub por `owner/repo` o URL del remoto; ver los conectados y los disponibles |
+| `find_projects_by_repository` | A qué proyecto pertenece un repo (por su remoto git) |
 | `get_board` | Columnas con sus tareas |
 | `search_tasks` | Búsqueda por texto, columna, responsable o tag |
 | `get_task` | Detalle con descripción, subtareas, comentarios, adjuntos, ramas y PRs |
@@ -201,7 +222,7 @@ claude mcp add --transport http todoapp https://todo.tudominio.com/api/mcp --hea
 | `add_comment` / `add_attachment` | Comentar o adjuntar una imagen (base64) |
 | `agent_queue`, `agent_claim`, `agent_submit_pr`, `agent_release` | Flujo del agente (ver abajo) |
 
-Los comentarios y cambios hechos por API muestran "vía <nombre del token>". Los errores devuelven las opciones válidas, por ejemplo las columnas existentes cuando se nombra una que no existe.
+Los comentarios y cambios hechos por API muestran "vía <nombre del token>". Crear proyectos y conectar repos requiere ser dueño del proyecto y no está permitido a los tokens de integración externa. Los errores devuelven las opciones válidas, por ejemplo las columnas existentes cuando se nombra una que no existe.
 
 Para integraciones sin SDK de MCP alcanza con un solo `POST` por operación, sin `initialize` previo:
 

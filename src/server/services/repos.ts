@@ -1,6 +1,7 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, type Tx } from "@/server/db";
 import {
+  projectMembers,
   projectRepositories,
   projects,
   repoInstallations,
@@ -14,7 +15,9 @@ import { emitDomainEvent, projectChannel, publish } from "@/server/events";
 import { type Actor, authorize } from "@/server/permissions/access";
 import { getProvider, type RepoEvent } from "@/server/repo-providers";
 import type { IncomingWebhook, ProviderInstallation, PullRequestInfo } from "@/server/repo-providers/types";
+import { env } from "@/server/env";
 import type { PrState } from "@/lib/domain";
+import { parseGitRemote } from "@/lib/git-remote";
 import { logActivity } from "./activity";
 import { onPullRequestClosed } from "./agent";
 import { loadTask } from "./tasks";
@@ -476,6 +479,64 @@ export async function connectRepo(
     await publish(tx, projectChannel(input.projectId), { type: "project" }, actor);
     return row;
   });
+}
+
+/** Enlace (con sesión en el navegador) para instalar la GitHub App o vincular el usuario de GitHub. */
+export const githubConnectUrl = (projectKey: string, mode: "install" | "link" = "install") =>
+  `${env.appUrl}/api/integrations/github/connect?project=${encodeURIComponent(projectKey)}${mode === "link" ? "&mode=link" : ""}`;
+
+/**
+ * Conecta un repositorio indicándolo como `owner/repo` o con su URL/remoto git.
+ * Si ya estaba conectado no falla. Si ToDoApp no tiene acceso, explica cómo dárselo.
+ */
+export async function connectRepoByName(actor: Actor, projectId: string, repository: string) {
+  const ref = parseGitRemote(repository);
+  if (!ref) throw badRequest(`"${repository}" no parece un repositorio (usá owner/repo o la URL del remoto)`);
+  if (ref.host !== "github.com") throw badRequest(`Por ahora solo se pueden conectar repositorios de GitHub (${ref.host} no es compatible)`);
+  await authorize(db, actor, projectId, "repo.connect");
+  const [project] = await db.select({ key: projects.key }).from(projects).where(eq(projects.id, projectId));
+
+  const sameName = (name: string) => name.toLowerCase() === ref.fullName.toLowerCase();
+  const connected = await db
+    .select()
+    .from(projectRepositories)
+    .where(and(eq(projectRepositories.projectId, projectId), eq(projectRepositories.provider, "github")));
+  const existing = connected.find((r) => sameName(r.fullName));
+  if (existing) return { repo: existing, alreadyConnected: true };
+
+  if (!getProvider("github")?.isConfigured()) {
+    throw badRequest("La integración con GitHub no está configurada en este servidor de ToDoApp");
+  }
+  const available = await listAvailableRepos(actor, projectId);
+  const match = available.find((r) => sameName(r.fullName));
+  if (!match) {
+    const owner = ref.fullName.split("/")[0];
+    const installedOnOwner = available.some((r) => r.account.toLowerCase() === owner.toLowerCase());
+    throw badRequest(
+      (installedOnOwner
+        ? `La GitHub App de ToDoApp está instalada en "${owner}" pero no tiene acceso a ${ref.fullName}. ` +
+          `Agregá el repositorio a la instalación desde ${githubConnectUrl(project.key)}.`
+        : `ToDoApp todavía no tiene acceso a ${ref.fullName}. Instalá la GitHub App en "${owner}" ` +
+          `(con acceso a ese repositorio) desde ${githubConnectUrl(project.key)}; si ya está instalada, ` +
+          `vinculá tu usuario de GitHub desde ${githubConnectUrl(project.key, "link")}.`) +
+        " Hay que abrir el enlace con la sesión de ToDoApp iniciada en el navegador; después reintentá.",
+    );
+  }
+  const repo = await connectRepo(actor, { projectId, installationId: match.installationId, externalRepoId: match.externalId });
+  return { repo, alreadyConnected: false };
+}
+
+/** Proyectos (de los que soy miembro) que tienen conectado ese repositorio. */
+export async function projectsForRepository(actor: Actor, repository: string) {
+  if (actor.type !== "user") throw forbidden();
+  const ref = parseGitRemote(repository);
+  if (!ref) throw badRequest(`"${repository}" no parece un repositorio (usá owner/repo o la URL del remoto)`);
+  return db
+    .select({ key: projects.key, name: projects.name, repository: projectRepositories.fullName, role: projectMembers.role })
+    .from(projectRepositories)
+    .innerJoin(projects, eq(projects.id, projectRepositories.projectId))
+    .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, actor.userId)))
+    .where(and(sql`lower(${projectRepositories.fullName}) = ${ref.fullName.toLowerCase()}`, isNull(projects.archivedAt)));
 }
 
 export async function disconnectRepo(actor: Actor, projectRepositoryId: string) {

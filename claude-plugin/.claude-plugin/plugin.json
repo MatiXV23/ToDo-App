@@ -1,0 +1,25 @@
+{
+  "name": "todoapp",
+  "version": "1.0.0",
+  "description": "Conector de ToDoApp: crea proyectos, los vincula al repo git en el que estás trabajando y lleva sus tareas (ramas, commits y PRs) desde Claude Code.",
+  "author": { "name": "Matías Pérez" },
+  "homepage": "https://github.com/MatiXV23/ToDo-App/tree/main/claude-plugin",
+  "repository": "https://github.com/MatiXV23/ToDo-App",
+  "license": "MIT",
+  "userConfig": {
+    "url": {
+      "type": "string",
+      "title": "URL de ToDoApp",
+      "description": "Dirección de tu ToDoApp, sin barra final",
+      "default": "https://todo.mperezfrontan.com",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "title": "Token de API",
+      "description": "Creálo en ToDoApp → menú de usuario → Tokens de API (empieza con tda_)",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

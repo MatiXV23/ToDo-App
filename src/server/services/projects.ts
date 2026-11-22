@@ -6,7 +6,7 @@ import { conflict, forbidden, notFound } from "@/server/errors";
 import { projectChannel, publish, userChannel } from "@/server/events";
 import { allowedActions } from "@/server/permissions";
 import { type Actor, authorize, getRole } from "@/server/permissions/access";
-import { DEFAULT_COLUMNS, PROJECT_KEY_RE } from "@/lib/domain";
+import { DEFAULT_COLUMNS, PROJECT_KEY_RE, slugify } from "@/lib/domain";
 import { ranksBetween } from "@/lib/rank";
 
 export const createProjectSchema = z.object({
@@ -46,6 +46,24 @@ export async function createProject(actor: Actor, input: z.input<typeof createPr
     await publish(tx, userChannel(actor.userId), { type: "projects" });
     return project;
   });
+}
+
+/**
+ * Clave libre derivada del nombre: iniciales si son varias palabras ("Mi Tienda Online" → MTO),
+ * o las primeras letras si es una sola ("portfolio" → PORT). Si ya existe, agrega un número.
+ */
+export async function suggestProjectKey(name: string) {
+  const words = slugify(name).split("-").filter(Boolean);
+  const letters = words.join("").replace(/^[0-9]+/, "");
+  let base = words.length >= 2 ? words.map((w) => w[0]).join("").slice(0, 4) : letters.slice(0, 4);
+  if (!/^[a-z]/.test(base)) base = `p${base}`;
+  if (base.length < 2) base = (letters + "px").slice(0, 3);
+  base = base.toUpperCase().slice(0, 8);
+  const taken = new Set(
+    (await db.select({ key: projects.key }).from(projects).where(sql`${projects.key} like ${`${base}%`}`)).map((r) => r.key),
+  );
+  if (!taken.has(base)) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base}${i}`)) return `${base}${i}`;
 }
 
 export async function listMyProjects(userId: string) {

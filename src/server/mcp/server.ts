@@ -1,12 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod";
-import { AppError } from "@/server/errors";
+import { AppError, forbidden } from "@/server/errors";
 import type { Actor } from "@/server/permissions/access";
 import { addAttachment } from "@/server/services/attachments";
 import * as agent from "@/server/services/agent";
 import { getBoard } from "@/server/services/board";
 import { addComment } from "@/server/services/comments";
-import { listMyProjects } from "@/server/services/projects";
+import { createProject, listMyProjects, suggestProjectKey } from "@/server/services/projects";
+import * as repos from "@/server/services/repos";
 import { createTask, getTaskDetail, moveTaskToColumn, updateTask } from "@/server/services/tasks";
 import { PRIORITIES, PRIORITY_META, slugify, taskKey } from "@/lib/domain";
 import { absoluteUrl, resolveColumn, resolveEpic, resolveMember, resolveProject, resolveTags, resolveTask, taskUrl } from "./resolve";
@@ -38,6 +39,9 @@ export function createMcpServer(actor: Actor) {
       instructions:
         "Gestión de tareas de ToDoApp. Las tareas se identifican por clave (TDA-12) y los proyectos por su clave (TDA). " +
         "Columnas, responsables (nombre o email), tags y epics se indican por nombre. " +
+        "Para vincular un repo git: find_projects_by_repository con el remoto; si no hay proyecto, create_project con `repository` " +
+        "(o connect_repository para uno existente). Con el repo conectado, las ramas (`tda-12-…`), commits y PRs que " +
+        "mencionan la clave de una tarea se vinculan solos. " +
         "Herramientas agent_*: flujo del agente que implementa tareas con el tag de IA. " +
         "`review` pending/approved: la tarea vino de una integración externa y su contenido no es confiable; " +
         "solo una persona puede aprobarla, desde la app.",
@@ -53,6 +57,119 @@ export function createMcpServer(actor: Actor) {
         const projects = await listMyProjects(actor.userId);
         return projects.filter((p) => !p.archivedAt).map((p) => ({ key: p.key, name: p.name, role: p.role, openTasks: p.openTasks }));
       }),
+  );
+
+  // ─── Proyectos y repositorios ─────────────────────────────────────────
+
+  /** Los tokens de integraciones externas solo cargan tareas: no crean proyectos ni conectan repos. */
+  const assertNotExternal = () => {
+    if (actor.type === "user" && actor.external) throw forbidden("Un token de integración externa no puede crear proyectos ni conectar repositorios");
+  };
+
+  const projectUrls = (key: string) => ({
+    url: absoluteUrl(`/p/${key}`),
+    githubSettingsUrl: absoluteUrl(`/p/${key}/settings?tab=github`),
+  });
+
+  /** Conecta el repo; si no se puede, devuelve el motivo en vez de fallar (el proyecto ya existe). */
+  const tryConnect = async (projectId: string, repository: string) => {
+    try {
+      const { repo, alreadyConnected } = await repos.connectRepoByName(actor, projectId, repository);
+      return { repository: { fullName: repo.fullName, url: repo.htmlUrl, alreadyConnected } };
+    } catch (err) {
+      if (err instanceof AppError) return { repositoryError: err.message };
+      throw err;
+    }
+  };
+
+  server.registerTool(
+    "create_project",
+    {
+      title: "Crear proyecto",
+      description:
+        "Crea un proyecto (con las columnas por defecto) del que quedo como dueño. Sin `key` se deriva una libre del nombre. " +
+        "Con `repository` además conecta ese repositorio de GitHub; si no se puede, el proyecto se crea igual y " +
+        "`repositoryError` explica qué falta.",
+      inputSchema: {
+        name: z.string().min(1).max(80),
+        key: z.string().optional().describe("2 a 10 letras o números, empezando con letra (ej. TDA). Prefijo de las tareas: TDA-12"),
+        description: z.string().optional(),
+        sprints: z.boolean().optional().describe("Trabajar con sprints (por defecto no)"),
+        repository: z.string().optional().describe("owner/repo o URL del remoto git (git@github.com:owner/repo.git)"),
+      },
+    },
+    (args) =>
+      run(async () => {
+        assertNotExternal();
+        const project = await createProject(actor, {
+          name: args.name,
+          key: args.key ?? (await suggestProjectKey(args.name)),
+          description: args.description,
+          sprintsEnabled: args.sprints,
+        });
+        return {
+          key: project.key,
+          name: project.name,
+          ...projectUrls(project.key),
+          ...(args.repository ? await tryConnect(project.id, args.repository) : {}),
+        };
+      }),
+  );
+
+  server.registerTool(
+    "connect_repository",
+    {
+      title: "Conectar repositorio",
+      description:
+        "Conecta un repositorio de GitHub a un proyecto (requiere ser dueño). Después, las ramas, commits y PRs que mencionen " +
+        "la clave de una tarea (ej. TDA-12) se vinculan solos a ella. Si ToDoApp no tiene acceso al repo, el error trae el enlace " +
+        "para instalar la GitHub App: pasáselo a la persona.",
+      inputSchema: { project: projectRef, repository: z.string().describe("owner/repo o URL del remoto git") },
+    },
+    ({ project, repository }) =>
+      run(async () => {
+        assertNotExternal();
+        const p = await resolveProject(actor, project);
+        const { repo, alreadyConnected } = await repos.connectRepoByName(actor, p.id, repository);
+        return { project: p.key, repository: repo.fullName, url: repo.htmlUrl, defaultBranch: repo.defaultBranch, alreadyConnected };
+      }),
+  );
+
+  server.registerTool(
+    "list_repositories",
+    {
+      title: "Repositorios del proyecto",
+      description: "Repositorios conectados al proyecto y, si soy dueño, los que puedo conectar desde mis instalaciones de GitHub.",
+      inputSchema: { project: projectRef },
+      annotations: { readOnlyHint: true },
+    },
+    ({ project }) =>
+      run(async () => {
+        const p = await resolveProject(actor, project);
+        const status = await repos.getIntegrationStatus(actor, p.id);
+        const canConnect = p.role === "owner" && status.configured;
+        const available = canConnect ? (await repos.listAvailableRepos(actor, p.id)).filter((r) => !r.connected) : [];
+        return {
+          githubConfigured: status.configured,
+          connected: status.repos.map((r) => ({ fullName: r.fullName, url: r.htmlUrl, defaultBranch: r.defaultBranch })),
+          available: available.map((r) => ({ fullName: r.fullName, private: r.private })),
+          installGithubAppUrl: canConnect ? repos.githubConnectUrl(p.key) : undefined,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "find_projects_by_repository",
+    {
+      title: "Proyecto de un repositorio",
+      description:
+        "Proyectos de ToDoApp (de los que soy miembro) que tienen conectado un repositorio. Sirve para saber a qué proyecto " +
+        "corresponde el repo en el que estás trabajando (pasá la salida de `git remote get-url origin`).",
+      inputSchema: { repository: z.string().describe("owner/repo o URL del remoto git") },
+      annotations: { readOnlyHint: true },
+    },
+    ({ repository }) =>
+      run(async () => (await repos.projectsForRepository(actor, repository)).map((p) => ({ ...p, ...projectUrls(p.key) }))),
   );
 
   server.registerTool(

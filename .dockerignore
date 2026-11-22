@@ -13,3 +13,5 @@ docker
 *.pem
 .claude
 .DS_Store
+claude-plugin
+.claude-plugin

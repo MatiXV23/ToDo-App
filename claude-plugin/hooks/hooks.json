@@ -1,0 +1,11 @@
+{
+  "description": "todoapp: al iniciar la sesión, avisa a Claude si el repo está vinculado a un proyecto de ToDoApp",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"" }]
+      }
+    ]
+  }
+}
